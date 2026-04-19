@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Chrome profili
+_chrome_profile/
+
+# Geçici dosyalar
+_cookies.txt
+_master.m3u8
+_variant_*.m3u8
+*.log
+
+# İndirilen videolar
+indirilenler/
+*.mp4
+*.mkv
+*.webm
+*.m3u8
+*.ts
+
+# Eski test dosyaları
+a.py
+b.py
+c.py
+d.py
+e.py
+f.py
+g.py
+h.py
+i.py
+test.py
+v1.py
+embed.py
+_capture_stream.py
+_cdp_capture.py
+_playwright_test.py
+_stream_capture_test.py
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
