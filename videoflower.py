@@ -1612,6 +1612,97 @@ async def _click_video_center(page):
     return False
 
 
+# Reklam/skip butonu metinleri — Playwright locator için
+_AD_SKIP_TEXTS = [
+    "reklamı geç", "reklam geç", "reklamı atla", "skip ad", "skip ads",
+    "skip", "atla", "geç", "close ad", "skip now",
+]
+_RESUME_DIALOG_TEXTS = [
+    "baştan başla", "start over", "restart", "yeniden başlat",
+    "başa dön", "from the beginning",
+]
+_PLAY_TEXTS = [
+    "videoyu başlat", "oynat", "izle", "play video", "watch now",
+    "play", "başlat", "tap to unmute",
+]
+_CLOSE_TEXTS = ["kapat", "close", "dismiss", "tamam", "×", "✕", "✖"]
+
+
+async def playwright_click_in_frame(frame, label=""):
+    """
+    Playwright locator API ile frame içindeki butonları tıkla.
+    JS tabanlı yaklaşımın göremediği shadow DOM / aria elementleri için.
+    Önce reklam-skip, sonra dialog, sonra play butonları denenir.
+    """
+    clicked = None
+    all_groups = [
+        ("skip", _AD_SKIP_TEXTS),
+        ("resume-dialog", _RESUME_DIALOG_TEXTS),
+        ("play", _PLAY_TEXTS),
+        ("close", _CLOSE_TEXTS),
+    ]
+    for group_name, texts in all_groups:
+        for text in texts:
+            try:
+                # exact=False ile kısmi metin eşleşmesi
+                loc = frame.get_by_text(text, exact=False)
+                count = await loc.count()
+                for i in range(min(count, 3)):
+                    el = loc.nth(i)
+                    try:
+                        if await el.is_visible(timeout=300):
+                            tag = await el.evaluate("el => el.tagName.toLowerCase()")
+                            # Sadece tıklanabilir elementler
+                            if tag in ("button", "a", "div", "span", "input", "label"):
+                                await el.click(timeout=1000, force=False)
+                                clicked = f"PW_CLICK [{group_name}]: '{text}'"
+                                log.info(f"  [{label}] {clicked}")
+                                return clicked
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+    # Role tabanlı buton arama — aria-label ile
+    skip_labels = ["skip", "close", "reklamı geç", "atla", "play", "oynat"]
+    for aria_text in skip_labels:
+        try:
+            loc = frame.get_by_role("button", name=aria_text, exact=False)
+            if await loc.count() > 0:
+                el = loc.first
+                if await el.is_visible(timeout=300):
+                    await el.click(timeout=1000)
+                    clicked = f"PW_ROLE_CLICK: '{aria_text}'"
+                    log.info(f"  [{label}] {clicked}")
+                    return clicked
+        except Exception:
+            pass
+
+    return None
+
+
+async def save_page_snapshot(page, label=""):
+    """
+    Sayfa HTML + iframe listesini dosyaya kaydet (debug için).
+    Stream yakalanamamışsa çağrılır.
+    """
+    try:
+        snap_path = os.path.join(SCRIPT_DIR, f"_snapshot_{label}_{int(time.time())}.html")
+        html = await page.content()
+        # Frame URL listesini HTML başına ekle
+        frame_info = "\n".join(
+            f"<!-- FRAME[{i}]: {f.url} -->"
+            for i, f in enumerate(page.frames)
+        )
+        with open(snap_path, "w", encoding="utf-8", errors="replace") as fh:
+            fh.write(f"<!-- SNAPSHOT: {page.url} -->\n{frame_info}\n{html}")
+        log.debug(f"  Sayfa snapshot kaydedildi: {snap_path}")
+        return snap_path
+    except Exception as e:
+        log.debug(f"  Snapshot kaydedilemedi: {e}")
+        return None
+
+
 async def ad_watcher_loop(page, found_streams, master_found_ref, duration=120):
     """
     Ana döngü: reklam atla, pop-up kapat, video başlat, stream yakala.
@@ -1640,27 +1731,43 @@ async def ad_watcher_loop(page, found_streams, master_found_ref, duration=120):
                 await asyncio.sleep(2)
             return
 
-        # Tüm frame'lerde reklam handler çalıştır
+        # Tüm frame'lerde reklam handler çalıştır (JS + Playwright locator)
         try:
+            action_taken = False
             for frame in page.frames:
                 try:
-                    result = await run_ad_handler(frame, f"f{elapsed}s")
-                    await force_autoplay(frame, f"f{elapsed}s")
-                    await extract_player_stream_candidates(frame, found_streams, f"f{elapsed}s")
+                    label = f"f{elapsed}s"
+                    result = await run_ad_handler(frame, label)
+                    await force_autoplay(frame, label)
+                    await extract_player_stream_candidates(frame, found_streams, label)
+
+                    # JS tabanlı tıklama buldu mu?
                     if result and result.get("found"):
                         ad_count += 1
                         actions = result.get("actions", [])
-                        # Sadece "Close/Kapat" tıklanıyorsa ve reklam sayısı artmıyorsa erken çık
                         if all("close" in a.lower() or "kapat" in a.lower() for a in actions if a):
                             consecutive_close_clicks += 1
                         else:
                             consecutive_close_clicks = 0
-                        # Erken çıkış: 8+ ardışık close, 60s geçmiş, reklam sayısı 8'den fazla değil
                         if consecutive_close_clicks >= 8 and elapsed > 60 and ad_count <= 8:
                             log.warning(f"  [{elapsed}s] Sadece 'Close' tıklanıyor, stream yok — döngü sonlandırılıyor")
                             return
-                        await asyncio.sleep(2)  # Aksiyon sonrası bekle
+                        action_taken = True
+                        await asyncio.sleep(2)
                         break
+
+                    # JS bulamadıysa Playwright locator ile dene (farklı DOM erişimi)
+                    if not action_taken:
+                        pw_result = await playwright_click_in_frame(frame, label)
+                        if pw_result:
+                            ad_count += 1
+                            if "close" in pw_result.lower():
+                                consecutive_close_clicks += 1
+                            else:
+                                consecutive_close_clicks = 0
+                            action_taken = True
+                            await asyncio.sleep(2)
+                            break
                 except Exception:
                     pass
         except Exception:
@@ -1924,16 +2031,25 @@ async def capture_general_playwright(film_url, embed_url=None, use_persistent=Fa
                     log.info(f"  ✓ STREAM (response-url): {rurl}")
                     return
                 ctype = (response.headers.get("content-type", "") or "").lower()
-                if "text/html" in ctype:
+                # HTML, görsel, font, CSS gibi büyük/alakasız yanıtları atla
+                skip_ctypes = ["text/html", "image/", "font/", "text/css", "video/", "audio/"]
+                if any(k in ctype for k in skip_ctypes):
                     return
-                if not any(k in ctype for k in ["json", "mpegurl", "dash+xml", "text/plain", "octet-stream"]):
-                    return
+                # Büyük binary yanıtları atla (segment indirme gibi)
+                content_len = response.headers.get("content-length", "0")
+                try:
+                    if int(content_len) > 500_000:
+                        return
+                except Exception:
+                    pass
                 body = await response.text()
+                if not body or len(body) < 10:
+                    return
                 for u in extract_stream_urls_from_text(body):
                     full = normalize_stream_candidate(u, rurl)
                     if looks_like_stream_candidate(full) and full not in found_streams:
                         found_streams.append(full)
-                        log.info(f"  ✓ STREAM (response): {full}")
+                        log.info(f"  ✓ STREAM (response-body [{ctype[:30]}]): {full}")
             except Exception:
                 pass
 
@@ -1992,6 +2108,21 @@ async def capture_general_playwright(film_url, embed_url=None, use_persistent=Fa
                     found_streams.append(stream)
             except Exception:
                 pass
+
+        # Hâlâ bulunamadıysa: her frame'de player_stream_candidates'ı bir kez daha dene
+        if not found_streams:
+            try:
+                for frame in page.frames:
+                    await extract_player_stream_candidates(frame, found_streams, "son_deneme")
+                    if found_streams:
+                        break
+            except Exception:
+                pass
+
+        # Yine bulunamadıysa snapshot kaydet (debug)
+        if not found_streams:
+            site_slug = (film_url or "").split("/")[2].replace(".", "_")[:30]
+            await save_page_snapshot(page, site_slug)
 
         # Cookie kaydet
         try:
