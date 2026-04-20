@@ -97,6 +97,7 @@ STREAM_HINTS = [
 
 BAD_STREAM_PARTS = [
     "blob:", "/embed/", ".css", ".js", "cloudfront.net/\\", "|", "(", ")", "{", "}",
+    ".webmanifest", "manifest.json", "favicon", "browserconfig",
 ]
 
 AD_DOMAINS = [
@@ -1636,44 +1637,50 @@ async def get_embed_url_browser(main_url):
 
     log.info("nodriver ile embed URL aranıyor...")
     main_domain = main_url.split("/")[2]
-    browser = await uc.start(headless=False)
-    tab = browser.main_tab
+    browser = None
     embed_url = None
     all_urls = []
 
-    async def on_request(event):
-        nonlocal embed_url
-        try:
-            url = event.request.url
-            if not url.startswith("http"):
-                return
-            if main_domain in url:
-                return
-            if any(s in url.lower() for s in SKIP_DOMAINS):
-                return
-            if any(url.lower().endswith(e) for e in SKIP_EXT):
-                return
-            all_urls.append(url)
-            if not embed_url:
-                embed_url = url
-                log.info(f"  Embed URL bulundu: {url}")
-        except Exception:
-            pass
-
-    tab.add_handler(cdp.network.RequestWillBeSent, on_request)
-    await tab.send(cdp.network.enable())
-    await tab.get(main_url)
-    await asyncio.sleep(8)
-
-    if not embed_url and all_urls:
-        log.debug("  Embed bulunamadı. Dış URL'ler:")
-        for u in all_urls[:10]:
-            log.debug(f"    {u[:100]}")
-
     try:
-        browser.stop()
-    except Exception:
-        pass
+        browser = await uc.start(headless=False)
+        tab = browser.main_tab
+
+        async def on_request(event):
+            nonlocal embed_url
+            try:
+                url = event.request.url
+                if not url.startswith("http"):
+                    return
+                if main_domain in url:
+                    return
+                if any(s in url.lower() for s in SKIP_DOMAINS):
+                    return
+                if any(url.lower().endswith(e) for e in SKIP_EXT):
+                    return
+                all_urls.append(url)
+                if not embed_url:
+                    embed_url = url
+                    log.info(f"  Embed URL bulundu: {url}")
+            except Exception:
+                pass
+
+        tab.add_handler(cdp.network.RequestWillBeSent, on_request)
+        await tab.send(cdp.network.enable())
+        await tab.get(main_url)
+        await asyncio.sleep(8)
+
+        if not embed_url and all_urls:
+            log.debug("  Embed bulunamadı. Dış URL'ler:")
+            for u in all_urls[:10]:
+                log.debug(f"    {u[:100]}")
+    except Exception as e:
+        log.debug(f"  nodriver embed arama hatası: {e}")
+    finally:
+        if browser:
+            try:
+                browser.stop()
+            except Exception:
+                pass
     return embed_url
 
 
@@ -1744,10 +1751,10 @@ async def capture_stream_nodriver(main_url, timeout=120):
 #   PLAYWRIGHT GENEL YAKALAMA (tüm siteler)
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def capture_general_playwright(film_url, embed_url=None):
+async def capture_general_playwright(film_url, embed_url=None, use_persistent=False):
     """
     Playwright ile genel stream yakalama.
-    Pichive OLMAYAN siteler için — standart tarayıcı, reklam atlama, network intercept.
+    use_persistent=True → Cloudflare bypass için kalıcı Chrome profili kullanır.
     """
     if not HAS_PLAYWRIGHT:
         log.warning("Playwright yüklü değil")
@@ -1757,20 +1764,57 @@ async def capture_general_playwright(film_url, embed_url=None):
     found_streams = []
     cookie_file = None
 
+    # LOCK dosyalarını temizle (persistent mod için)
+    if use_persistent:
+        try:
+            for root, dirs, files in os.walk(PROFILE_DIR):
+                for fname in files:
+                    if fname == "LOCK":
+                        try:
+                            os.remove(os.path.join(root, fname))
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
     async with async_playwright() as p:
-        log.info("Playwright tarayıcı başlatılıyor (genel mod)...")
-        browser = await p.chromium.launch(
-            headless=False,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-            ],
-        )
-        context = await browser.new_context(
-            user_agent=UA,
-            viewport={"width": 1280, "height": 800},
-            locale="tr-TR",
-        )
+        if use_persistent:
+            log.info("Playwright tarayıcı başlatılıyor (persistent CF bypass modu)...")
+            try:
+                context = await p.chromium.launch_persistent_context(
+                    user_data_dir=PROFILE_DIR,
+                    headless=False,
+                    viewport={"width": 1280, "height": 800},
+                    user_agent=UA,
+                    locale="tr-TR",
+                    ignore_default_args=["--enable-automation"],
+                    args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+                )
+            except Exception:
+                context = await p.chromium.launch_persistent_context(
+                    user_data_dir=PROFILE_DIR,
+                    headless=False,
+                    channel="chrome",
+                    viewport={"width": 1280, "height": 800},
+                    user_agent=UA,
+                    locale="tr-TR",
+                    ignore_default_args=["--enable-automation"],
+                    args=["--disable-blink-features=AutomationControlled"],
+                )
+        else:
+            log.info("Playwright tarayıcı başlatılıyor (genel mod)...")
+            browser = await p.chromium.launch(
+                headless=False,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                ],
+            )
+            context = await browser.new_context(
+                user_agent=UA,
+                viewport={"width": 1280, "height": 800},
+                locale="tr-TR",
+            )
         await context.add_init_script(STEALTH_JS)
 
         page = await context.new_page()
@@ -1875,7 +1919,11 @@ async def capture_general_playwright(film_url, embed_url=None):
             pass
 
         await context.close()
-        await browser.close()
+        if not use_persistent:
+            try:
+                await browser.close()
+            except Exception:
+                pass
 
     best_stream = pick_best_stream_url(found_streams)
     return best_stream, cookie_file
@@ -2450,11 +2498,17 @@ async def process_url(url, output_dir=".", snippet_seconds=0):
 
     if not embed_url and site_rule.get("prefer_browser_embed"):
         log.info("Site kuralı: Tarayıcı ile embed arama öncelikli")
-        embed_url = await get_embed_url_browser(url)
+        try:
+            embed_url = await get_embed_url_browser(url)
+        except Exception as _e:
+            log.debug(f"  Browser embed arama hatası: {_e}")
 
     if not embed_url:
         log.info("  HTML'den bulunamadı, tarayıcı ile aranıyor...")
-        embed_url = await get_embed_url_browser(url)
+        try:
+            embed_url = await get_embed_url_browser(url)
+        except Exception as _e:
+            log.debug(f"  Browser embed arama hatası (2): {_e}")
 
     if embed_url:
         embed_rule_key, embed_rule = match_site_rule(embed_url)
@@ -2525,7 +2579,9 @@ async def process_url(url, output_dir=".", snippet_seconds=0):
     # ── Adım 5: Playwright genel yakalama ──
     if not stream_url and (site_rule.get("prefer_playwright") or embed_rule.get("prefer_playwright") or True):
         log.info("Playwright ile doğrudan yakalama deneniyor...")
-        stream_url, cookie_file = await capture_general_playwright(url, embed_url)
+        # CF engeli varsa kalıcı Chrome profili kullan (CF cookie'leri saklı)
+        use_pers = cf_blocked_html and bool(site_rule.get("prefer_playwright"))
+        stream_url, cookie_file = await capture_general_playwright(url, embed_url, use_persistent=use_pers)
 
     # ── Adım 6: nodriver fallback ──
     if not stream_url:
@@ -2714,6 +2770,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
