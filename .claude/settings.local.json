@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la E:\\\\\\\\a/ --ignore=.venv)",
+      "Bash(py *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(python -m py_compile videoflower.py)",
+      "Bash(python videoflower.py --test --snippet 10 \"https://dizi54.life/dizi/no-tail-to-tell/1-sezon-1-bolum/25939\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(python videoflower.py --test --snippet 10)",
+      "Bash(git -C /e/a remote -v)",
+      "Bash(gh auth *)",
+      "Bash(git commit *)",
+      "Bash(gh repo *)"
+    ]
+  }
+}
