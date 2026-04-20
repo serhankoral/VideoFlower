@@ -4,8 +4,8 @@ Otonom video indirme aracı. Film ve dizi sitelerindeki videoları otomatik olar
 
 ## Özellikler
 
-- **YouTube** — tek video ve playlist indirme
-- **Çoklu Türk site desteği** — hdfilmcehennemi, hdfilmizle, dizi54, jetfilmizle, izleplus, zeusdizi, dizibox ve genel siteler
+- Tek video ve playlist indirme
+- **Çoklu Türk site desteği**
 - **Otonom reklam atlama** — "Reklamı Geç", "Skip Ad", overlay reklamlar otomatik kapatılır
 - **Otomatik video başlatma** — JWPlayer, Video.js ve HTML5 player API desteği
 - **Cloudflare bypass** — persistent Chrome profili ile CF korumalı sitelere erişim
@@ -61,7 +61,7 @@ python videoflower.py https://www.youtube.com/watch?v=XXXX
 python videoflower.py url1 url2 url3
 ```
 
-### YouTube playlist
+### Playlist
 
 ```bash
 python videoflower.py "https://www.youtube.com/playlist?list=XXXX"
@@ -112,14 +112,6 @@ python videoflower.py --log chrome_net.json https://site.com/film
 
 | Site | Tür | Yöntem |
 |------|-----|--------|
-| youtube.com / youtu.be | Video / Playlist | yt-dlp |
-| hdfilmcehennemi.llc / .nl | Film / Dizi | Playwright + JWT decode |
-| hdfilmizle.so | Film | HTML decode + Python HLS |
-| dizi54.life | Dizi | Playwright + Python HLS |
-| jetfilmizle.net | Dizi | Playwright |
-| izleplus.com | Film | Playwright + Python HLS |
-| zeusdizi31.com | Film | Playwright |
-| dizibox.live | Dizi | Playwright + nodriver |
 | Genel siteler | Otomatik | Playwright + nodriver fallback |
 
 ## Nasıl Çalışır
@@ -127,7 +119,7 @@ python videoflower.py --log chrome_net.json https://site.com/film
 ```
 URL geldi
   │
-  ├─ YouTube? → yt-dlp ile direkt indir
+  ├─ url? → yt-dlp ile direkt indir
   │
   └─ Film/Dizi sitesi?
        │
