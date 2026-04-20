@@ -1,5 +1,5 @@
 # VideoFlower
-
+Test Amaçlı yapılmış bir programdan,oluşacak her türlü hukuki sorumluluk program kullanıcısına aittir.
 Otonom video indirme aracı. Film ve dizi sitelerindeki videoları otomatik olarak bulur, reklamları atlar ve en iyi kalitede indirir.
 
 ## Özellikler
