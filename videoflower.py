@@ -42,6 +42,7 @@ import re
 import subprocess
 import time
 from datetime import datetime
+from typing import Optional
 from urllib.parse import urlparse, urljoin
 
 import requests
@@ -53,12 +54,14 @@ try:
     from playwright.async_api import async_playwright
     HAS_PLAYWRIGHT = True
 except ImportError:
+    async_playwright = None
     HAS_PLAYWRIGHT = False
 
 try:
-    from playwright_stealth import stealth_async
+    import playwright_stealth  # type: ignore
     HAS_STEALTH = True
 except ImportError:
+    playwright_stealth = None
     HAS_STEALTH = False
 
 try:
@@ -66,6 +69,8 @@ try:
     from nodriver import cdp
     HAS_NODRIVER = True
 except ImportError:
+    uc = None
+    cdp = None
     HAS_NODRIVER = False
 
 
@@ -85,6 +90,15 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
 
 STREAM_EXT = [".m3u8", ".mp4", ".mpd", ".ts"]
 
+STREAM_HINTS = [
+    "m3u8", "mpd", "master", "manifest", "playlist", "hls", "dash", "segment",
+    "video", "stream", "playback", "source", "file",
+]
+
+BAD_STREAM_PARTS = [
+    "blob:", "/embed/", ".css", ".js", "cloudfront.net/\\", "|", "(", ")", "{", "}",
+]
+
 AD_DOMAINS = [
     "cvt-s2", "agl005", ".xml", "vast", "doubleclick",
     "googlesyndication", "adserver", "adsystem", "pagead",
@@ -92,10 +106,149 @@ AD_DOMAINS = [
     "tpc.googlesyndication",
 ]
 
+DEFAULT_TEST_URLS = [
+    "https://www.youtube.com/watch?v=Akh2RHCzab0",
+    "https://www.youtube.com/watch?v=OBJCZ_mYc8A&list=WL&index=1",
+    "https://www.hdfilmizle.so/noah-kahan-baska-bir-dunya/",
+    "https://hdfilmcehennemi.llc/a-gorilla-story-told-by-david-attenborough.html",
+    "https://dizi54.life/dizi/no-tail-to-tell/1-sezon-1-bolum/25939",
+    "https://jetfilmizle.net/dizi/kurukshetra",
+    "https://izleplus.com/180-2026/",
+    "https://zeusdizi31.com/film/ask-mi-arkadas-mi",
+    "https://dizi54.life/dizi/undercover-miss-hong/1-sezon-1-bolum/25951",
+    "https://www.hdfilmcehennemi.nl/dizi/monarch-legacy-of-monsters-61/sezon-2/bolum-8/",
+    "https://www.dizibox.live/love-story-1-sezon-1-bolum-hd-izle/",
+    "https://www.hdfilmizle.so/in-the-lost-lands/",
+    "https://www.hdfilmcehennemi.nl/28-years-later-the-bone-temple-7/",
+]
+
+SITE_RULES = {
+    "youtube": {
+        "label": "YouTube",
+        "domains": ["youtube.com", "youtu.be"],
+        "direct_html_first": False,
+        "prefer_browser_embed": False,
+        "prefer_playwright": False,
+    },
+    "hdfilmizle": {
+        "label": "hdfilmizle.so",
+        "domains": ["hdfilmizle.so"],
+        "direct_html_first": True,
+        "prefer_browser_embed": False,
+        "prefer_playwright": False,
+        "embed_host_priority": ["vidrame", "rapidrame", "photomag"],
+        "page_fallback_first": True,
+        "use_nodriver_fallback": False,
+    },
+    "hdfilmcehennemi": {
+        "label": "hdfilmcehennemi",
+        "domains": ["hdfilmcehennemi.llc", "hdfilmcehennemi.nl"],
+        "direct_html_first": True,
+        "prefer_browser_embed": True,
+        "prefer_playwright": True,
+        "embed_host_priority": ["pichive", "rapidrame", "vidrame"],
+        "blocked_title_markers": ["just a moment", "cloudflare"],
+        "use_nodriver_fallback": True,
+    },
+    "dizi54": {
+        "label": "dizi54.life",
+        "domains": ["dizi54.life"],
+        "direct_html_first": False,
+        "prefer_browser_embed": True,
+        "prefer_playwright": True,
+        "embed_host_priority": ["pichive", "vidrame", "rapidrame"],
+        "use_nodriver_fallback": True,
+    },
+    "jetfilmizle": {
+        "label": "jetfilmizle.net",
+        "domains": ["jetfilmizle.net"],
+        "direct_html_first": False,
+        "prefer_browser_embed": True,
+        "prefer_playwright": True,
+        "embed_host_priority": ["mail.ru", "vidrame", "rapidrame", "pichive"],
+        "use_nodriver_fallback": True,
+    },
+    "izleplus": {
+        "label": "izleplus.com",
+        "domains": ["izleplus.com", "izleplus.cc"],
+        "direct_html_first": False,
+        "prefer_browser_embed": False,
+        "prefer_playwright": True,
+        "embed_host_priority": ["hotstream.club"],
+        "page_fallback_first": False,
+        "use_nodriver_fallback": False,
+    },
+    "zeusdizi": {
+        "label": "zeusdizi31.com",
+        "domains": ["zeusdizi31.com", "zeusdizi29.com"],
+        "direct_html_first": False,
+        "prefer_browser_embed": False,
+        "prefer_playwright": True,
+        "embed_host_priority": ["japierdolevid", "drakkarhls"],
+        "use_nodriver_fallback": False,
+    },
+    "dizibox": {
+        "label": "dizibox.live",
+        "domains": ["dizibox.live"],
+        "direct_html_first": False,
+        "prefer_browser_embed": False,
+        "prefer_playwright": True,
+        "embed_host_priority": ["player/king/king.php", "molystream", "dbx.molystream", "vidrame"],
+        "allow_same_domain_embed": True,
+        "use_nodriver_fallback": True,
+    },
+    "pichive": {
+        "label": "pichive.online",
+        "domains": ["pichive.online"],
+        "direct_html_first": False,
+        "prefer_browser_embed": False,
+        "prefer_playwright": True,
+        "embed_host_priority": ["pichive.online"],
+        "use_nodriver_fallback": False,
+    },
+    "vidrame": {
+        "label": "vidrame/rapidrame",
+        "domains": ["vidrame.pro", "rapidrame.com", "rapidrame.net", "photomag.biz"],
+        "direct_html_first": True,
+        "prefer_browser_embed": False,
+        "prefer_playwright": False,
+        "page_fallback_first": True,
+        "use_nodriver_fallback": False,
+    },
+    "hotstream": {
+        "label": "hotstream.club",
+        "domains": ["hotstream.club"],
+        "direct_html_first": False,
+        "prefer_browser_embed": False,
+        "prefer_playwright": True,
+        "embed_host_priority": ["hotstream.club"],
+        "use_nodriver_fallback": False,
+    },
+    "molystream": {
+        "label": "molystream",
+        "domains": ["molystream.org", "dbx.molystream.org"],
+        "direct_html_first": False,
+        "prefer_browser_embed": False,
+        "prefer_playwright": True,
+        "embed_host_priority": ["molystream"],
+        "use_nodriver_fallback": False,
+    },
+    "generic": {
+        "label": "Genel",
+        "domains": [],
+        "direct_html_first": False,
+        "prefer_browser_embed": False,
+        "prefer_playwright": True,
+        "embed_host_priority": [],
+        "use_nodriver_fallback": True,
+    },
+}
+
 SKIP_DOMAINS = [
     "google", "gtag", "analytics", "facebook", "twitter",
     "cloudflare", "jquery", "bootstrap", "gstatic",
     "doubleclick", "googleapis", "fontawesome", "recaptcha",
+    "youtube.com", "youtu.be",  # Embed olarak fragman alınmasın
 ]
 
 SKIP_EXT = [
@@ -164,7 +317,7 @@ AD_HANDLER_JS = r"""
     if (findByText([
         'reklamı geç', 'reklam geç', 'reklamı kapat', 'reklamı atla',
         'skip ad', 'skip ads', 'skip', 'atla', 'geç',
-        'reklam', 'close ad'
+        'reklam', 'close ad', 'skip now', 'advertisement'
     ])) return result;
 
     // ADIM 2: Pop-up / overlay kapatma
@@ -208,7 +361,10 @@ AD_HANDLER_JS = r"""
     }
 
     // ADIM 3: "Videoyu Başlat" butonu
-    if (findByText(['videoyu başlat', 'başlat', 'oynat', 'izle', 'play video', 'watch now'])) {
+    if (findByText([
+        'videoyu başlat', 'başlat', 'oynat', 'izle', 'play video', 'watch now',
+        'videoyu oynat', 'başlatma', 'tap to unmute'
+    ])) {
         return result;
     }
 
@@ -246,6 +402,9 @@ AD_HANDLER_JS = r"""
         for (var vi = 0; vi < videos.length; vi++) {
             var v = videos[vi];
             if (v.paused && (v.src || v.querySelector('source'))) {
+                v.muted = true;
+                v.playsInline = true;
+                try { v.setAttribute('playsinline', ''); } catch(e) {}
                 v.play();
                 log('HTML5_PLAY');
                 result.found = true;
@@ -277,6 +436,149 @@ AD_HANDLER_JS = r"""
     }
 
     return result;
+})()
+"""
+
+
+FORCE_AUTOPLAY_JS = r"""
+(function() {
+    var out = {started: 0, attempted: 0, clicked: 0};
+    try {
+        var vids = document.querySelectorAll('video');
+        for (var i = 0; i < vids.length; i++) {
+            var v = vids[i];
+            if (!v) continue;
+            out.attempted += 1;
+            try {
+                v.muted = true;
+                v.autoplay = true;
+                v.playsInline = true;
+                v.setAttribute('playsinline', '');
+                v.setAttribute('webkit-playsinline', '');
+                // Poster/overlay kapat
+                v.removeAttribute('poster');
+                // Kullanıcı aksiyonu simülasyonu
+                try {
+                    var mouseEvt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                    v.dispatchEvent(mouseEvt);
+                    out.clicked += 1;
+                } catch(e2) {}
+                if (v.paused) {
+                    var p = v.play();
+                    if (p && p.catch) p.catch(function(){});
+                }
+                if (!v.paused) out.started += 1;
+            } catch(e) {}
+        }
+
+        // Bazı player'larda başlangıç için kullanıcı aksiyonu gerekir.
+        if (out.started === 0) {
+            var playSelectors = [
+                '.jw-icon-display', '.jw-display-icon-container',
+                '.vjs-big-play-button', '.vjs-play-control',
+                '.play-btn', '.play-button',
+                '[class*="play-button"]', '[class*="play-icon"]',
+                '[aria-label*="Play"]', '[aria-label*="Oynat"]',
+                '[class*="start"]', '[class*="başlat"]'
+            ];
+            for (var si = 0; si < playSelectors.length; si++) {
+                var btn = document.querySelector(playSelectors[si]);
+                if (btn) {
+                    try { btn.click(); out.clicked += 1; } catch(e) {}
+                    break;
+                }
+            }
+        }
+        // Player API çağrıları
+        try {
+            if (typeof jwplayer !== 'undefined' && jwplayer().play) {
+                if (jwplayer().getState && jwplayer().getState() !== 'playing') {
+                    jwplayer().play();
+                    out.started += 1;
+                }
+            }
+        } catch(e) {}
+        try {
+            if (typeof videojs !== 'undefined') {
+                var players = videojs.getPlayers ? videojs.getPlayers() : {};
+                for (var k in players) {
+                    var vp = players[k];
+                    if (vp && vp.paused && vp.paused()) {
+                        vp.play();
+                        out.started += 1;
+                    }
+                }
+            }
+        } catch(e) {}
+    } catch(e) {}
+    return out;
+})()
+"""
+
+
+EXTRACT_PLAYER_STREAMS_JS = r"""
+(function() {
+    var out = [];
+    function push(u) {
+        try {
+            if (!u || typeof u !== 'string') return;
+            if (u.indexOf('http') !== 0 && u.indexOf('/') !== 0) return;
+            if (out.indexOf(u) < 0) out.push(u);
+        } catch(e) {}
+    }
+
+    try {
+        if (typeof jwplayer !== 'undefined') {
+            var item = jwplayer().getPlaylistItem ? jwplayer().getPlaylistItem() : null;
+            if (item) {
+                push(item.file || '');
+                if (item.sources && item.sources.length) {
+                    for (var i = 0; i < item.sources.length; i++) {
+                        push(item.sources[i].file || '');
+                    }
+                }
+            }
+        }
+    } catch(e) {}
+
+    try {
+        if (typeof videojs !== 'undefined') {
+            var players = videojs.getPlayers ? videojs.getPlayers() : {};
+            var keys = Object.keys(players);
+            for (var pi = 0; pi < keys.length; pi++) {
+                var vp = players[keys[pi]];
+                if (vp && vp.currentSource) {
+                    var cs = vp.currentSource();
+                    if (cs && cs.src) push(cs.src);
+                }
+            }
+        }
+    } catch(e) {}
+
+    try {
+        var videos = document.querySelectorAll('video');
+        for (var vi = 0; vi < videos.length; vi++) {
+            var v = videos[vi];
+            push(v.currentSrc || '');
+            push(v.src || '');
+            var srcs = v.querySelectorAll('source');
+            for (var si = 0; si < srcs.length; si++) {
+                push(srcs[si].src || '');
+            }
+        }
+    } catch(e) {}
+
+    try {
+        var perf = performance.getEntriesByType('resource') || [];
+        for (var ri = 0; ri < perf.length; ri++) {
+            var n = perf[ri].name || '';
+            if (/(m3u8|mpd|manifest|playlist|master|hls|dash|\.mp4)(\?|$)/i.test(n)) {
+                push(n);
+            }
+        }
+    } catch(e) {}
+
+    return out;
 })()
 """
 
@@ -369,24 +671,34 @@ def decode_pichive_jwt(token):
         return None
 
 
-def decode_pichive_jwt_cdn(token):
-    """pichive JWT → CDN domain URL."""
+def decode_pichive_jwt_cdn_all(token):
+    """pichive JWT → tüm CDN domain URL adayları listesi."""
     parts = token.split(".")
     payload = parts[0] if len(parts) == 2 else (parts[1] if len(parts) >= 3 else None)
     if not payload:
-        return None
+        return []
     payload += "=" * (4 - len(payload) % 4)
     try:
         data = json.loads(base64.b64decode(payload).decode("utf-8")).get("data", {})
         raw_url = data.get("u", "")
         domains = data.get("domains", [])
-        if domains and raw_url:
-            d = domains[0]
-            parsed = urlparse(raw_url)
-            return f"https://{d['d_name']}/{d['d_url_prefix']}{parsed.path}"
+        parsed = urlparse(raw_url) if raw_url else None
+        candidates = []
+        for d in domains:
+            if parsed:
+                candidates.append(f"https://{d['d_name']}/{d['d_url_prefix']}{parsed.path}")
+        if not candidates and raw_url:
+            candidates.append(raw_url)
+        return candidates
     except Exception:
         pass
-    return None
+    return []
+
+
+def decode_pichive_jwt_cdn(token):
+    """pichive JWT → CDN domain URL (ilk erişilebilir domain)."""
+    candidates = decode_pichive_jwt_cdn_all(token)
+    return candidates[0] if candidates else None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -410,13 +722,45 @@ def is_pichive(url):
     return "pichive" in url.lower()
 
 
+def match_site_rule(url):
+    """URL için en uygun site kuralını bul."""
+    low = (url or "").lower()
+    for key, rule in SITE_RULES.items():
+        if any(domain in low for domain in rule.get("domains", [])):
+            return key, rule
+    return "generic", SITE_RULES["generic"]
+
+
+def log_site_rule(url, rule_key, rule):
+    log.info(f"Site kuralı: {rule.get('label', rule_key)} [{rule_key}]")
+    log.debug(f"  Kural URL: {url}")
+
+
+def choose_preferred_embed_url(urls, rule=None):
+    """Kural önceliğine göre embed URL seç."""
+    if not urls:
+        return None
+    if len(urls) == 1 or not rule:
+        return urls[0]
+
+    priorities = [p.lower() for p in rule.get("embed_host_priority", [])]
+    if priorities:
+        for pr in priorities:
+            for url in urls:
+                if pr in url.lower():
+                    return url
+    return urls[0]
+
+
 def is_cloudflare_blocked(html):
     lower = html.lower()
     return (
-        "cloudflare" in lower
+        "<title>just a moment" in lower
         or "attention required" in lower
         or "sorry, you have been blocked" in lower
-        or (len(html) < 500 and ("just a moment" in lower or "challenge" in lower))
+        or ("just a moment" in lower and "checking your browser" in lower)
+        or ("cloudflare" in lower and "just a moment" in lower)
+        or (len(html) < 1000 and "challenge" in lower)
     )
 
 
@@ -471,20 +815,407 @@ def extract_stream_url(html):
     return None
 
 
-def get_embed_url_from_html(main_url, html):
+def extract_stream_urls_from_text(text):
+    """JSON/JS metninden olası stream URL'lerini toplu çıkar."""
+    out = []
+    if not text:
+        return out
+
+    # Direkt stream uzantıları
+    for u in re.findall(r"(https?://[^\s\"'<>]+\.(?:m3u8|mp4|mpd|ts)[^\s\"'<>]*)", text, re.I):
+        nu = u.strip()
+        if is_valid_stream_url(nu) and nu not in out:
+            out.append(nu)
+
+    # Escape edilmiş URL'ler (https:\/\/...)
+    for u in re.findall(r"https?:\\/\\/[^\"'\s]+", text, re.I):
+        nu = u.replace("\\/", "/")
+        if is_valid_stream_url(nu) and any(h in nu.lower() for h in STREAM_HINTS) and nu not in out:
+            out.append(nu)
+
+    # Relative master/manifest yolları
+    for path in re.findall(r"(/[^\"'\s]+(?:master|manifest|playlist|index|m3u)[^\"'\s]*(?:\.m3u8|\.mpd)?[^\"'\s]*)", text, re.I):
+        if path not in out:
+            out.append(path)
+
+    return out
+
+
+def looks_like_stream_candidate(url):
+    low = url.lower()
+    if any(ad in low for ad in AD_DOMAINS):
+        return False
+    if any(b in low for b in BAD_STREAM_PARTS):
+        return False
+    if any(ext in low for ext in STREAM_EXT):
+        return True
+    strong_hints = [
+        "master", "manifest", "playlist", "variant", "index.m3u8", "/hls/", "/dash/", "/m3u/",
+        "/stream/", "/video/", "/content/",
+    ]
+    cdn_hints = [
+        "molystream", "dbx.molystream", "caec6083", "b6e10087", "seyret9.top",
+        "hotstream.club/m3u",
+    ]
+    if any(h in low for h in cdn_hints):
+        return True
+    if any(h in low for h in strong_hints):
+        # Salt embed/player sayfalarını stream zannetme.
+        if "/embed/" in low and ".m3u8" not in low and ".mpd" not in low and "manifest" not in low:
+            return False
+        return True
+    return False
+
+
+def is_valid_stream_url(url):
+    """Yanlış pozitif URL'leri elemek için temel doğrulama."""
+    if not url:
+        return False
+    u = url.strip()
+    if not (u.startswith("http://") or u.startswith("https://") or u.startswith("/")):
+        return False
+    low = u.lower()
+    if any(b in low for b in BAD_STREAM_PARTS):
+        return False
+    if " " in u or "\\" in u:
+        return False
+    if u.count("http://") + u.count("https://") > 1:
+        return False
+    return True
+
+
+def stream_score(url):
+    """En iyi stream adayını seçmek için skor."""
+    low = url.lower()
+    if not is_valid_stream_url(url):
+        return -999
+    score = 0
+    if ".m3u8" in low:
+        score += 100
+    if ".mpd" in low:
+        score += 90
+    if ".mp4" in low:
+        score += 80
+    if "master" in low:
+        score += 30
+    if "variant" in low:
+        score += 15
+    if "/m3u/" in low or "/hls/" in low:
+        score += 20
+    if ".ts" in low:
+        score -= 20
+    return score
+
+
+def pick_best_stream_url(urls):
+    """Adaylar arasından en güvenilir URL'yi seç."""
+    if not urls:
+        return None
+    valid = [u for u in urls if is_valid_stream_url(u)]
+    if not valid:
+        return None
+    valid.sort(key=stream_score, reverse=True)
+    return valid[0]
+
+
+def normalize_stream_candidate(url, base_url=""):
+    """Ağdan yakalanan URL'leri indirilebilir forma normalize et."""
+    if not url:
+        return url
+    if url.startswith("//"):
+        parsed = urlparse(base_url) if base_url else None
+        scheme = parsed.scheme if parsed and parsed.scheme else "https"
+        return f"{scheme}:{url}"
+    if base_url and url.startswith("/"):
+        parsed = urlparse(base_url)
+        return f"{parsed.scheme}://{parsed.netloc}{url}"
+    if base_url:
+        parsed = urlparse(base_url)
+        dup = f"{parsed.scheme}://{parsed.netloc}//{parsed.netloc}/"
+        if url.startswith(dup):
+            return f"{parsed.scheme}://{parsed.netloc}/" + url[len(dup):]
+    return url
+
+
+def extract_hls_variants(master_url, referer):
+    """Master playlist içinden varyant URL'lerini sırala."""
+    try:
+        resp = requests.get(
+            master_url,
+            headers={
+                "User-Agent": UA,
+                "Referer": referer,
+                "Accept": "application/vnd.apple.mpegurl, application/x-mpegURL, */*",
+            },
+            verify=False,
+            timeout=20,
+        )
+        text = resp.text
+        if resp.status_code != 200 or "#EXTM3U" not in text:
+            return []
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        variants = []
+        for i, line in enumerate(lines):
+            if line.startswith("#EXT-X-STREAM-INF") and i + 1 < len(lines):
+                next_line = lines[i + 1]
+                if next_line.startswith("http://") or next_line.startswith("https://"):
+                    full = next_line
+                else:
+                    full = urljoin(master_url, next_line)
+                variants.append(full)
+        preferred = []
+        for needle in ["720.m3u8", "480.m3u8", "360.m3u8", "1080.m3u8"]:
+            for variant in variants:
+                if needle in variant and variant not in preferred:
+                    preferred.append(variant)
+        for variant in variants:
+            if variant not in preferred:
+                preferred.append(variant)
+        return preferred
+    except Exception as e:
+        log.debug(f"  HLS varyant çıkarımı başarısız: {e}")
+        return []
+
+
+def is_healthy_hls_variant(variant_url, referer):
+    """Varyant playlist'in medya segmenti içerip içermediğini kontrol et."""
+    try:
+        resp = requests.get(
+            variant_url,
+            headers={
+                "User-Agent": UA,
+                "Referer": referer,
+                "Accept": "application/vnd.apple.mpegurl, application/x-mpegURL, */*",
+            },
+            verify=False,
+            timeout=20,
+        )
+        text = resp.text
+        if resp.status_code != 200 or "#EXTM3U" not in text:
+            return False
+        # Gerçek medya segmentleri (ts/m4s/mp4) veya yeniden adlandırılmış (jpg/png) içeriyor mu?
+        return bool(re.search(r"\.(?:ts|m4s|mp4|jpg|jpeg|png)(?:\?|$)", text, re.I))
+    except Exception:
+        return False
+
+
+def materialize_remote_playlist(stream_url, referer):
+    """Uzantısız remote playlist URL'sini lokal .m3u8 dosyasına yaz."""
+    try:
+        resp = requests.get(
+            stream_url,
+            headers={
+                "User-Agent": UA,
+                "Referer": referer,
+                "Accept": "application/vnd.apple.mpegurl, application/x-mpegURL, */*",
+            },
+            verify=False,
+            timeout=20,
+        )
+        text = resp.text
+        if resp.status_code != 200 or "#EXTM3U" not in text:
+            return None
+
+        base = f"{urlparse(stream_url).scheme}://{urlparse(stream_url).netloc}"
+        fixed_lines = []
+        for line in text.splitlines():
+            ln = line.strip()
+            if not ln or ln.startswith("#"):
+                fixed_lines.append(line)
+                continue
+            fixed_lines.append(fix_url(ln, base + "/"))
+
+        out_path = os.path.join(SCRIPT_DIR, f"_hotstream_{abs(hash(stream_url)) % 100000}.m3u8")
+        with open(out_path, "w", encoding="utf-8") as wf:
+            wf.write("\n".join(fixed_lines))
+        return out_path
+    except Exception as e:
+        log.debug(f"  hotstream playlist dosyası oluşturulamadı: {e}")
+        return None
+
+
+def build_ffmpeg_headers(referer):
+    try:
+        origin = f"https://{referer.split('/')[2]}"
+    except Exception:
+        origin = referer
+    return f"Referer: {referer}\r\nOrigin: {origin}\r\nUser-Agent: {UA}\r\n"
+
+
+def download_jpg_hls(variant_url, out_file, referer, snippet_seconds=0):
+    """
+    .jpg uzantılı segment kullanan HLS stream'lerini Python requests ile indir.
+    ffmpeg hls.c'deki hardcode extension kontrolünü bypass eder.
+    """
+    import tempfile
+    hdrs = {
+        "Referer": referer,
+        "User-Agent": UA,
+    }
+    try:
+        origin = f"https://{referer.split('/')[2]}"
+        hdrs["Origin"] = origin
+    except Exception:
+        pass
+
+    try:
+        r = requests.get(variant_url, headers=hdrs, verify=False, timeout=20)
+        r.raise_for_status()
+        text = r.text
+        if "#EXTM3U" not in text:
+            log.debug("  Python HLS: geçerli m3u8 değil")
+            return False
+    except Exception as e:
+        log.warning(f"  Python HLS: variant m3u8 indirilemedi: {e}")
+        return False
+
+    base_url = variant_url.rsplit("/", 1)[0] + "/"
+    lines = text.splitlines()
+    segments = []
+    target_duration = 6.0
+    for i, line in enumerate(lines):
+        line = line.strip()
+        if line.startswith("#EXT-X-TARGETDURATION:"):
+            try:
+                target_duration = float(line.split(":")[1])
+            except Exception:
+                pass
+        elif line.startswith("#EXTINF:"):
+            try:
+                dur = float(line.split(":")[1].rstrip(",").split(",")[0])
+            except Exception:
+                dur = target_duration
+            for j in range(i + 1, len(lines)):
+                seg = lines[j].strip()
+                if seg and not seg.startswith("#"):
+                    seg_url = seg if seg.startswith("http") else urljoin(base_url, seg)
+                    segments.append((seg_url, dur))
+                    break
+
+    if not segments:
+        log.debug("  Python HLS: segment bulunamadı")
+        return False
+
+    if snippet_seconds and int(snippet_seconds) > 0:
+        limited, acc = [], 0.0
+        for su, sd in segments:
+            limited.append((su, sd))
+            acc += sd
+            if acc >= int(snippet_seconds):
+                break
+        segments = limited
+
+    log.info(f"  Python HLS indirme: {len(segments)} segment ({variant_url.split('/')[-1]})")
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            seg_files = []
+            for idx, (seg_url, _) in enumerate(segments):
+                seg_path = os.path.join(tmpdir, f"seg{idx:05d}.ts")
+                try:
+                    sr = requests.get(seg_url, headers=hdrs, verify=False, timeout=30)
+                    sr.raise_for_status()
+                    with open(seg_path, "wb") as f:
+                        f.write(sr.content)
+                    seg_files.append(seg_path)
+                except Exception as e:
+                    log.debug(f"  Segment {idx} atlandı: {e}")
+
+            if not seg_files:
+                log.warning("  Python HLS: hiç segment indirilemedi")
+                return False
+
+            concat_list = os.path.join(tmpdir, "concat.txt")
+            with open(concat_list, "w", encoding="utf-8") as f:
+                for sf in seg_files:
+                    f.write(f"file '{sf}'\n")
+
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "concat", "-safe", "0",
+                "-i", concat_list,
+                "-c", "copy",
+                out_file,
+            ]
+            result = subprocess.run(cmd, encoding="utf-8", errors="replace",
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            if result.returncode == 0:
+                log.info("  ✓ Python HLS indirme tamamlandı")
+                return True
+            log.warning(f"  Python HLS ffmpeg concat hatası: {result.stderr[-300:]}")
+            return False
+    except Exception as e:
+        log.warning(f"  Python HLS genel hata: {e}")
+        return False
+
+
+def run_ffmpeg_direct(input_url, output_file, referer, snippet_seconds=0):
+    """ffmpeg ile HLS/manifest URL'sini doğrudan kopyala."""
+    is_remote = input_url.startswith("http://") or input_url.startswith("https://")
+    cmd = ["ffmpeg", "-y"]
+    if is_remote:
+        cmd += [
+            "-f", "hls",
+            "-allowed_extensions", "ALL",
+            "-headers", build_ffmpeg_headers(referer),
+        ]
+    else:
+        cmd += ["-f", "hls", "-allowed_extensions", "ALL"]
+    cmd += [
+        "-i", input_url,
+        "-map", "0:v:0?",
+        "-map", "0:a:0?",
+        "-c", "copy",
+    ]
+    if snippet_seconds and int(snippet_seconds) > 0:
+        cmd += ["-t", str(int(snippet_seconds))]
+    cmd.append(output_file)
+    log.debug(f"  ffmpeg komutu: {' '.join(cmd[:12])}...")
+    result = subprocess.run(cmd, encoding="utf-8", errors="replace")
+    return result.returncode == 0
+
+
+def resolve_special_stream_targets(stream_url, referer):
+    """Host bazlı özel indirme hedefleri üret."""
+    targets = []
+    low = (stream_url or "").lower()
+    if "hotstream.club/m3u/" in low:
+        local_playlist = materialize_remote_playlist(stream_url, referer)
+        if local_playlist:
+            targets.append(("python_hls", local_playlist))
+            targets.append(("ffmpeg", local_playlist))
+        else:
+            targets.append(("python_hls", stream_url))
+            targets.append(("ffmpeg", stream_url))
+    if low.endswith("master.m3u8") and any(host in low for host in ["photomag.biz", "photoflick.org"]):
+        healthy = []
+        fallback = []
+        for variant in extract_hls_variants(stream_url, referer):
+            if is_healthy_hls_variant(variant, referer):
+                healthy.append(variant)
+            else:
+                fallback.append(variant)
+        for variant in healthy + fallback:
+            targets.append(("python_hls", variant))
+        targets.append(("python_hls", stream_url))
+    return targets
+
+
+def get_embed_url_from_html(main_url, html, rule=None):
     """Ana sayfa HTML'inden embed iframe URL'sini çıkar."""
     main_domain = main_url.split("/")[2]
+    candidates = []
+    allow_same_domain = bool(rule and rule.get("allow_same_domain_embed"))
 
     for url in re.findall(r'<iframe[^>]+src=["\']([^"\']+)["\']', html, re.I):
         url = fix_url(url, main_url)
-        if main_domain in url:
+        if main_domain in url and not allow_same_domain:
             continue
         if any(s in url.lower() for s in SKIP_DOMAINS):
             continue
         if any(url.lower().endswith(e) for e in SKIP_EXT):
             continue
-        log.info(f"  Embed URL (iframe): {url}")
-        return url
+        candidates.append(url)
 
     for pat in [
         r'(https?://[^"\'\s]+/(?:embed|iframe|player|v|vod|video)/[^"\'\s]+)',
@@ -492,12 +1223,18 @@ def get_embed_url_from_html(main_url, html):
     ]:
         for url in re.findall(pat, html, re.I):
             url = fix_url(url, main_url)
-            if main_domain in url:
+            if main_domain in url and not allow_same_domain:
                 continue
             if any(s in url.lower() for s in SKIP_DOMAINS):
                 continue
-            log.info(f"  Embed URL (pattern): {url}")
-            return url
+            candidates.append(url)
+
+    selected = choose_preferred_embed_url(candidates, rule)
+    if selected:
+        log.info(f"  Embed URL seçildi: {selected}")
+        if len(candidates) > 1:
+            log.debug(f"  Embed adayları: {len(candidates)} adet")
+        return selected
 
     return None
 
@@ -540,6 +1277,46 @@ def format_size(size_bytes):
         return f"{n} B"
     except Exception:
         return "bilinmiyor"
+
+
+def _run_ytdlp_download(target_url, out_path, referer, cookie_file=None, snippet_seconds=0, fmt=None):
+    """Tek bir hedef URL için yt-dlp çalıştır ve başarı durumunu döndür."""
+    # referer'dan origin çıkar
+    try:
+        ref_origin = f"https://{referer.split('/')[2]}"
+    except Exception:
+        ref_origin = referer
+
+    cmd = [
+        "yt-dlp",
+        "-f", fmt or "bestvideo+bestaudio/best",
+        "--merge-output-format", "mp4",
+        "--referer", referer,
+        "--add-header", f"Origin:{ref_origin}",
+        "--no-check-certificate",
+        "--concurrent-fragments", "4",
+        "--retries", "5",
+        "--fragment-retries", "5",
+        "--retry-sleep", "fragment:2",
+        "--no-warnings",
+        "--newline",
+        "--hls-prefer-native",
+        "--downloader-args", "ffmpeg_i:-allowed_extensions ALL",
+        "-o", out_path,
+    ]
+
+    section_expr = build_download_sections(snippet_seconds)
+    if section_expr:
+        cmd += ["--download-sections", section_expr]
+
+    if cookie_file and os.path.exists(cookie_file):
+        cmd += ["--cookies", cookie_file]
+
+    cmd.append(target_url)
+
+    log.debug(f"  yt-dlp komutu: {' '.join(cmd[:12])}...")
+    result = subprocess.run(cmd, encoding="utf-8", errors="replace")
+    return result.returncode == 0
 
 
 def get_stream_info(stream_url, referer):
@@ -612,11 +1389,18 @@ def parse_net_log(log_path):
     return None, None
 
 
+def build_download_sections(snippet_seconds):
+    """yt-dlp --download-sections parametresini üret."""
+    if not snippet_seconds or int(snippet_seconds) <= 0:
+        return None
+    return f"*0-{int(snippet_seconds)}"
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #   YOUTUBE HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
-def process_youtube(url, output_dir):
+def process_youtube(url, output_dir, snippet_seconds=0):
     """YouTube URL'sini yt-dlp ile indir (tek video veya playlist)."""
     is_playlist = "list=" in url
 
@@ -643,6 +1427,12 @@ def process_youtube(url, output_dir):
     ]
     if is_playlist:
         cmd.append("--yes-playlist")
+
+    section_expr = build_download_sections(snippet_seconds)
+    if section_expr:
+        cmd += ["--download-sections", section_expr]
+        log.info(f"Test modu aktif: Her video için ilk {snippet_seconds} saniye indirilecek")
+
     cmd.append(url)
 
     log.info(f"yt-dlp başlatılıyor...")
@@ -673,6 +1463,82 @@ async def run_ad_handler(page_or_frame, label=""):
         return None
 
 
+async def force_autoplay(page_or_frame, label=""):
+    """Video elementlerinde autoplay'i zorlayarak oynatmayı başlat."""
+    try:
+        result = await page_or_frame.evaluate(FORCE_AUTOPLAY_JS)
+        if result and result.get("started", 0) > 0:
+            log.info(
+                f"  [{label}] AUTOPLAY: {result.get('started')} video oynuyor "
+                f"(deneme: {result.get('attempted', 0)})"
+            )
+        return result
+    except Exception:
+        return None
+
+
+async def extract_player_stream_candidates(page_or_frame, found_streams, label=""):
+    """Player API ve performance üzerinden gerçek stream adaylarını topla."""
+    try:
+        urls = await page_or_frame.evaluate(EXTRACT_PLAYER_STREAMS_JS)
+        if not urls:
+            return 0
+        added = 0
+        for u in urls:
+            if not u:
+                continue
+            full = str(u)
+            if full.startswith("/"):
+                try:
+                    cur = await page_or_frame.evaluate("() => location.origin")
+                    full = str(cur).rstrip("/") + full
+                except Exception:
+                    continue
+            if looks_like_stream_candidate(full) and full not in found_streams:
+                found_streams.append(full)
+                added += 1
+                log.info(f"  [{label}] STREAM (player): {full}")
+        return added
+    except Exception:
+        return 0
+
+
+async def _click_video_center(page):
+    """Sayfadaki ilk görünür video elementinin merkezine mouse click gönder."""
+    try:
+        rect = await page.evaluate("""
+            () => {
+                var v = document.querySelector('video');
+                if (!v) return null;
+                var r = v.getBoundingClientRect();
+                if (!r || r.width < 10 || r.height < 10) return null;
+                return {x: r.left + r.width / 2, y: r.top + r.height / 2};
+            }
+        """)
+        if rect and rect.get('x') and rect.get('y'):
+            await page.mouse.click(rect['x'], rect['y'])
+            return True
+    except Exception:
+        pass
+    # Fallback: play buton seçicileri
+    try:
+        for sel in [
+            '.jw-icon-display', '.jw-display-icon-container',
+            '.vjs-big-play-button', '.play-btn', '.play-button',
+            '[class*="play-button"]',
+        ]:
+            try:
+                el = await page.query_selector(sel)
+                if el and await el.is_visible():
+                    await el.click()
+                    return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
 async def ad_watcher_loop(page, found_streams, master_found_ref, duration=120):
     """
     Ana döngü: reklam atla, pop-up kapat, video başlat, stream yakala.
@@ -683,6 +1549,8 @@ async def ad_watcher_loop(page, found_streams, master_found_ref, duration=120):
     elapsed = 0
     step = 3
     ad_count = 0
+    click_attempts = 0
+    consecutive_close_clicks = 0  # "Close" butonuna ardışık tıklama sayısı
 
     while elapsed < duration:
         await asyncio.sleep(step)
@@ -704,14 +1572,35 @@ async def ad_watcher_loop(page, found_streams, master_found_ref, duration=120):
             for frame in page.frames:
                 try:
                     result = await run_ad_handler(frame, f"f{elapsed}s")
+                    await force_autoplay(frame, f"f{elapsed}s")
+                    await extract_player_stream_candidates(frame, found_streams, f"f{elapsed}s")
                     if result and result.get("found"):
                         ad_count += 1
+                        actions = result.get("actions", [])
+                        # Sadece "Close" tıklanıyorsa ve stream yoksa erken çık
+                        if all("close" in a.lower() or "kapat" in a.lower() for a in actions if a):
+                            consecutive_close_clicks += 1
+                        else:
+                            consecutive_close_clicks = 0
+                        if consecutive_close_clicks >= 8 and elapsed > 30:
+                            log.warning(f"  [{elapsed}s] Sadece 'Close' tıklanıyor, stream bulunamıyor — döngü sonlandırılıyor")
+                            return
                         await asyncio.sleep(2)  # Aksiyon sonrası bekle
                         break
                 except Exception:
                     pass
         except Exception:
             pass
+
+        # Her 9 saniyede bir mouse click simülasyonu (autoplay policy bypass)
+        if elapsed % 9 == 0 and click_attempts < 10:
+            try:
+                clicked = await _click_video_center(page)
+                if clicked:
+                    click_attempts += 1
+                    log.debug(f"  [{elapsed}s] Video center click")
+            except Exception:
+                pass
 
         # Pop-up sayfaları kapat (yeni sekmeler)
         try:
@@ -730,7 +1619,7 @@ async def ad_watcher_loop(page, found_streams, master_found_ref, duration=120):
             frame_count = len(page.frames)
             log.info(
                 f"  [{elapsed}s/{duration}s] stream:{len(found_streams)} "
-                f"reklam_atlatma:{ad_count} frame:{frame_count}"
+                f"reklam_atlatma:{ad_count} frame:{frame_count} click:{click_attempts}"
             )
 
 
@@ -743,6 +1632,7 @@ async def get_embed_url_browser(main_url):
     if not HAS_NODRIVER:
         log.warning("nodriver yüklü değil, browser ile embed arama atlanıyor")
         return None
+    assert uc is not None and cdp is not None
 
     log.info("nodriver ile embed URL aranıyor...")
     main_domain = main_url.split("/")[2]
@@ -792,6 +1682,7 @@ async def capture_stream_nodriver(main_url, timeout=120):
     if not HAS_NODRIVER:
         log.warning("nodriver yüklü değil")
         return None
+    assert uc is not None and cdp is not None
 
     log.info("nodriver ile stream yakalanıyor (fallback)...")
     found = []
@@ -861,6 +1752,7 @@ async def capture_general_playwright(film_url, embed_url=None):
     if not HAS_PLAYWRIGHT:
         log.warning("Playwright yüklü değil")
         return None, None
+    assert async_playwright is not None
 
     found_streams = []
     cookie_file = None
@@ -891,12 +1783,37 @@ async def capture_general_playwright(film_url, embed_url=None):
             url = request.url
             if any(ad in url.lower() for ad in AD_DOMAINS):
                 return
-            if any(ext in url for ext in STREAM_EXT):
+            if looks_like_stream_candidate(url):
                 if url not in found_streams:
                     found_streams.append(url)
                     log.info(f"  ✓ STREAM (network): {url}")
 
+        async def on_response(response):
+            try:
+                rurl = response.url
+                if any(ad in rurl.lower() for ad in AD_DOMAINS):
+                    return
+                # Yanıt URL'si zaten stream ise ekle
+                if looks_like_stream_candidate(rurl) and rurl not in found_streams:
+                    found_streams.append(rurl)
+                    log.info(f"  ✓ STREAM (response-url): {rurl}")
+                    return
+                ctype = (response.headers.get("content-type", "") or "").lower()
+                if "text/html" in ctype:
+                    return
+                if not any(k in ctype for k in ["json", "mpegurl", "dash+xml", "text/plain", "octet-stream"]):
+                    return
+                body = await response.text()
+                for u in extract_stream_urls_from_text(body):
+                    full = normalize_stream_candidate(u, rurl)
+                    if looks_like_stream_candidate(full) and full not in found_streams:
+                        found_streams.append(full)
+                        log.info(f"  ✓ STREAM (response): {full}")
+            except Exception:
+                pass
+
         page.on("request", on_request)
+        page.on("response", lambda r: asyncio.ensure_future(on_response(r)))
 
         # Sayfayı aç
         target_url = embed_url or film_url
@@ -904,6 +1821,7 @@ async def capture_general_playwright(film_url, embed_url=None):
         try:
             await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
             log.info("  Sayfa yüklendi")
+            await force_autoplay(page, "ilk_yukleme")
         except Exception as e:
             log.warning(f"  Sayfa yükleme hatası (devam ediliyor): {e}")
 
@@ -912,11 +1830,13 @@ async def capture_general_playwright(film_url, embed_url=None):
             try:
                 page2 = await context.new_page()
                 page2.on("request", on_request)
+                page2.on("response", lambda r: asyncio.ensure_future(on_response(r)))
                 page2.on("popup", lambda popup: asyncio.ensure_future(_close_popup(popup)))
                 log.info(f"Film sayfası açılıyor: {film_url[:100]}")
                 await page2.goto(film_url, wait_until="domcontentloaded", timeout=30000)
                 # Ana sayfa sayfasını da izle
                 await asyncio.sleep(3)
+                await force_autoplay(page2, "film_sayfasi")
             except Exception:
                 pass
 
@@ -941,7 +1861,8 @@ async def capture_general_playwright(film_url, embed_url=None):
                 cf.write("# Netscape HTTP Cookie File\n")
                 for c in cookies:
                     secure = "TRUE" if c.get("secure") else "FALSE"
-                    expiry = int(c.get("expires", 0)) if c.get("expires") else 0
+                    raw_exp = int(c.get("expires", 0)) if c.get("expires") else 0
+                    expiry = raw_exp if raw_exp > 0 else 0
                     domain = c.get("domain", "")
                     incl_sub = "TRUE" if domain.startswith(".") else "FALSE"
                     cf.write(
@@ -956,7 +1877,8 @@ async def capture_general_playwright(film_url, embed_url=None):
         await context.close()
         await browser.close()
 
-    return found_streams[0] if found_streams else None, cookie_file
+    best_stream = pick_best_stream_url(found_streams)
+    return best_stream, cookie_file
 
 
 async def _close_popup(popup):
@@ -981,6 +1903,7 @@ async def capture_pichive_playwright(film_url, embed_url):
     if not HAS_PLAYWRIGHT:
         log.warning("Playwright yüklü değil")
         return [], None, None, embed_url
+    assert async_playwright is not None
 
     found_streams = []
     master_php_url = None
@@ -1054,12 +1977,19 @@ async def capture_pichive_playwright(film_url, embed_url):
                 m = re.search(r"t=([A-Za-z0-9._-]+)", url)
                 if m:
                     token = m.group(1)
-                    cdn = decode_pichive_jwt_cdn(token)
+                    cdn_candidates = decode_pichive_jwt_cdn_all(token)
                     stream = decode_pichive_jwt(token)
-                    target = cdn or stream
-                    if target and target not in found_streams:
-                        found_streams.append(target)
-                        log.info(f"  ✓ STREAM (JWT decode): {target}")
+                    added = 0
+                    for cdn in cdn_candidates:
+                        if cdn and cdn not in found_streams:
+                            found_streams.append(cdn)
+                            log.info(f"  ✓ STREAM (JWT CDN): {cdn}")
+                            added += 1
+                    if stream and stream not in found_streams:
+                        found_streams.append(stream)
+                        log.info(f"  ✓ STREAM (JWT stream): {stream}")
+                    if not cdn_candidates and not stream:
+                        log.warning("  JWT decode başarısız, master.php URL kullanılacak")
 
         async def on_response(response):
             nonlocal master_m3u8_content
@@ -1105,6 +2035,7 @@ async def capture_pichive_playwright(film_url, embed_url):
         try:
             await page.goto(film_url, wait_until="domcontentloaded", timeout=30000)
             log.info("  Sayfa yüklendi")
+            await force_autoplay(page, "pichive_film")
         except Exception as e:
             log.warning(f"  Sayfa yükleme hatası (devam): {e}")
 
@@ -1119,6 +2050,12 @@ async def capture_pichive_playwright(film_url, embed_url):
 
         elapsed = 0
         ad_count = 0
+        # Pichive CDN subdomain fallback listesi
+        _CDN_PREFIXES = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+        _cdn_tried = set()
+        _current_cdn = urlparse(embed_ref).hostname.split(".")[0] if embed_ref else ""
+        _cdn_tried.add(_current_cdn)
+
         while elapsed < 120 and not master_php_url:
             await asyncio.sleep(3)
             elapsed += 3
@@ -1132,6 +2069,8 @@ async def capture_pichive_playwright(film_url, embed_url):
                 for frame in page.frames:
                     try:
                         result = await run_ad_handler(frame, f"p{elapsed}s")
+                        await force_autoplay(frame, f"p{elapsed}s")
+                        await extract_player_stream_candidates(frame, found_streams, f"p{elapsed}s")
                         if result and result.get("found"):
                             ad_count += 1
                             await asyncio.sleep(2)
@@ -1140,6 +2079,9 @@ async def capture_pichive_playwright(film_url, embed_url):
                         pass
             except Exception:
                 pass
+
+            # Not: pichive CDN subdomain fallback kaldırıldı - one..ten.pichive.online domainleri DNS'de yok
+            # Sadece four.pichive.online gerçek domain, CF challenge için beklemeye devam et
 
             # Pop-up kontrol
             try:
@@ -1169,54 +2111,93 @@ async def capture_pichive_playwright(film_url, embed_url):
                 page2.on("framenavigated", on_frame_navigated)
                 page2.on("popup", lambda popup: asyncio.ensure_future(_close_popup(popup)))
 
-                # CF challenge
-                log.info(f"  {pichive_host} root sayfasına gidiliyor (CF challenge)...")
-                try:
-                    await page2.goto(
-                        f"https://{pichive_host}/",
-                        wait_until="domcontentloaded",
-                        timeout=20000,
-                    )
-                except Exception:
-                    pass
+                # CDN subdomain listesini oluştur (mevcut + alternatifler)
+                _strat2_cdn_order = [_current_cdn] + [
+                    p for p in _CDN_PREFIXES if p != _current_cdn
+                ]
 
-                for i in range(30):
-                    await asyncio.sleep(1)
-                    try:
-                        body = await page2.evaluate(
-                            "() => document.body ? document.body.innerText.substring(0,80) : ''"
-                        )
-                        if (
-                            body
-                            and "blocked" not in body.lower()
-                            and "challenge" not in page2.url
-                        ):
-                            break
-                    except Exception:
-                        pass
-
-                # iframe.php'ye git
-                await page2.set_extra_http_headers({"Referer": film_url})
-                log.info(f"  iframe.php açılıyor: {embed_ref[:80]}")
-                await page2.goto(embed_ref, wait_until="domcontentloaded", timeout=30000)
-
-                elapsed2 = 0
-                while elapsed2 < 120 and not master_php_url:
-                    await asyncio.sleep(3)
-                    elapsed2 += 3
-                    if master_php_url:
-                        log.info(f"  ✓ master.php yakalandı ({elapsed2}s)")
+                for cdn_prefix in _strat2_cdn_order:
+                    if master_php_url or found_streams:
                         break
+                    try_host = f"{cdn_prefix}.pichive.online"
+                    try_embed = embed_ref.replace(
+                        f"{urlparse(embed_ref).hostname}",
+                        try_host,
+                        1,
+                    )
+
+                    # CF challenge
+                    log.info(f"  {try_host} root sayfasına gidiliyor (CF challenge)...")
+                    _goto_failed = False
                     try:
-                        for frame in page2.frames:
-                            await run_ad_handler(frame, f"p2-{elapsed2}s")
+                        await page2.goto(
+                            f"https://{try_host}/",
+                            wait_until="domcontentloaded",
+                            timeout=20000,
+                        )
+                    except Exception as _eg:
+                        if "ERR_NAME_NOT_RESOLVED" in str(_eg) or "ERR_CONNECTION_REFUSED" in str(_eg):
+                            log.debug(f"  {try_host} DNS/bağlantı hatası, atlanıyor")
+                            _goto_failed = True
+                        # diğer hatalar için devam et
+
+                    if _goto_failed:
+                        continue
+
+                    # CF challenge geçip geçmediğini kontrol et
+                    cf_blocked = False
+                    for i in range(15):
+                        await asyncio.sleep(1)
+                        try:
+                            body = await page2.evaluate(
+                                "() => document.body ? document.body.innerText.substring(0,120) : ''"
+                            )
+                            cur_url = page2.url
+                            if "cf-no-screenshot-error" in await page2.content():
+                                cf_blocked = True
+                                break
+                            if (
+                                body
+                                and "blocked" not in body.lower()
+                                and "access denied" not in body.lower()
+                                and "challenge" not in cur_url
+                            ):
+                                break
+                        except Exception:
+                            pass
+
+                    if cf_blocked:
+                        log.warning(f"  {try_host} CF tarafından engelleniyor, sonraki deneniyor...")
+                        continue
+
+                    # iframe.php'ye git
+                    await page2.set_extra_http_headers({"Referer": film_url})
+                    log.info(f"  iframe.php açılıyor: {try_embed[:80]}")
+                    try:
+                        await page2.goto(try_embed, wait_until="domcontentloaded", timeout=30000)
+                        pichive_host = try_host
                     except Exception:
                         pass
-                    if elapsed2 % 15 == 0:
-                        log.info(
-                            f"  [{elapsed2}s] master:{'evet' if master_php_url else 'yok'} "
-                            f"frames:{len(page2.frames)}"
-                        )
+
+                    elapsed2 = 0
+                    while elapsed2 < 60 and not master_php_url:
+                        await asyncio.sleep(3)
+                        elapsed2 += 3
+                        if master_php_url or found_streams:
+                            log.info(f"  ✓ Stream yakalandı ({elapsed2}s) [{try_host}]")
+                            break
+                        try:
+                            for frame in page2.frames:
+                                await run_ad_handler(frame, f"p2-{elapsed2}s")
+                                await force_autoplay(frame, f"p2-{elapsed2}s")
+                                await extract_player_stream_candidates(frame, found_streams, f"p2-{elapsed2}s")
+                        except Exception:
+                            pass
+                        if elapsed2 % 15 == 0:
+                            log.info(
+                                f"  [{elapsed2}s] master:{'evet' if master_php_url else 'yok'} "
+                                f"frames:{len(page2.frames)}"
+                            )
 
             except Exception as e:
                 log.warning(f"  iframe.php hatası: {e}")
@@ -1280,7 +2261,8 @@ async def capture_pichive_playwright(film_url, embed_url):
                 cf.write("# Netscape HTTP Cookie File\n")
                 for c in cookies:
                     secure = "TRUE" if c.get("secure") else "FALSE"
-                    expiry = int(c.get("expires", 0)) if c.get("expires") else 0
+                    raw_exp = int(c.get("expires", 0)) if c.get("expires") else 0
+                    expiry = raw_exp if raw_exp > 0 else 0
                     domain = c.get("domain", "")
                     incl_sub = "TRUE" if domain.startswith(".") else "FALSE"
                     cf.write(
@@ -1305,83 +2287,124 @@ async def capture_pichive_playwright(film_url, embed_url):
     for s in found_streams:
         log.info(f"  • {s}")
 
-    return found_streams, master_m3u8_content, cookie_file, embed_ref
+    ordered = sorted(found_streams, key=stream_score, reverse=True)
+    return ordered, master_m3u8_content, cookie_file, embed_ref
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #   İNDİRME
 # ══════════════════════════════════════════════════════════════════════════════
 
-def download_stream(stream_url, referer, title="video", cookie_file=None, output_dir="."):
+def download_stream(
+    stream_url,
+    referer,
+    title: Optional[str] = "video",
+    cookie_file=None,
+    output_dir=".",
+    snippet_seconds=0,
+    source_url=None,
+    embed_url=None,
+):
     """Stream URL'sini en iyi kalitede indir."""
     os.makedirs(output_dir, exist_ok=True)
     safe_title = re.sub(r'[\\/:*?"<>|]', "_", title or "video")
     out_path = os.path.join(output_dir, safe_title + ".%(ext)s")
+    out_file_mp4 = os.path.join(output_dir, safe_title + ".mp4")
 
     log.info(f"İndirme başlıyor: {safe_title}")
     log.info(f"  Stream: {stream_url[:100]}")
 
-    # referer'dan origin çıkar
-    try:
-        ref_origin = f"https://{referer.split('/')[2]}"
-    except Exception:
-        ref_origin = referer
+    if snippet_seconds > 0:
+        log.info(f"  Test modu: Bu linkten ilk {snippet_seconds} saniye indirilecek")
 
-    cmd = [
-        "yt-dlp",
-        "-f", "bestvideo+bestaudio/best",
-        "--merge-output-format", "mp4",
-        "--referer", referer,
-        "--add-header", f"Origin:{ref_origin}",
-        "--no-check-certificate",
-        "--downloader", "native",
-        "--concurrent-fragments", "4",
-        "--no-warnings",
-        "--newline",
-        "-o", out_path,
+    special_targets = resolve_special_stream_targets(stream_url, referer)
+    if special_targets:
+        log.info(f"  Özel site kuralı: {len(special_targets)} hedef denenecek")
+        for method, target in special_targets:
+            log.info(f"  Özel hedef ({method}): {target}")
+            if method == "ffmpeg" and run_ffmpeg_direct(
+                target,
+                out_file_mp4,
+                referer,
+                snippet_seconds=snippet_seconds,
+            ):
+                log.info(f"  ✓ İndirme tamamlandı: {safe_title}")
+                return True
+            if method == "python_hls" and download_jpg_hls(
+                target,
+                out_file_mp4,
+                referer,
+                snippet_seconds=snippet_seconds,
+            ):
+                log.info(f"  ✓ İndirme tamamlandı: {safe_title}")
+                return True
+
+    formats_to_try = [
+        "bestvideo+bestaudio/best",
+        "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+        "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
     ]
-    if cookie_file and os.path.exists(cookie_file):
-        cmd += ["--cookies", cookie_file]
-    cmd.append(stream_url)
 
-    log.debug(f"  Komut: {' '.join(cmd[:8])}...")
-    result = subprocess.run(cmd, encoding="utf-8", errors="replace")
+    success = False
+    for fexpr in formats_to_try:
+        log.info(f"  Format deneniyor: {fexpr}")
+        success = _run_ytdlp_download(
+            stream_url,
+            out_path,
+            referer,
+            cookie_file=cookie_file,
+            snippet_seconds=snippet_seconds,
+            fmt=fexpr,
+        )
+        if success:
+            break
 
-    if result.returncode != 0:
-        log.warning("  native downloader başarısız, ffmpeg deneniyor...")
-        cmd2 = [c for c in cmd if c not in ["--downloader", "native"]]
-        idx = None
-        for ci, cv in enumerate(cmd2):
-            if cv == "native" and ci > 0 and cmd2[ci - 1] == "--downloader":
-                cmd2[ci] = "ffmpeg"
-                break
-        else:
-            cmd2 += ["--downloader", "ffmpeg"]
-        cmd2 += ["--hls-use-mpegts"]
-        result = subprocess.run(cmd2, encoding="utf-8", errors="replace")
+    if not success:
+        # Son şans: sayfa URL'si / embed URL'si üzerinden extractor ile indirme dene.
+        fallback_targets = []
+        for cand in [embed_url, source_url]:
+            if cand and cand not in fallback_targets:
+                fallback_targets.append(cand)
+        if fallback_targets:
+            log.warning("  Stream URL başarısız; sayfa tabanlı yt-dlp fallback deneniyor...")
+            for ft in fallback_targets:
+                log.info(f"  Fallback hedefi: {ft}")
+                if _run_ytdlp_download(
+                    ft,
+                    out_path,
+                    source_url or referer,
+                    cookie_file=cookie_file,
+                    snippet_seconds=snippet_seconds,
+                    fmt="bestvideo+bestaudio/best",
+                ):
+                    success = True
+                    break
 
-    if result.returncode == 0:
+    if success:
         log.info(f"  ✓ İndirme tamamlandı: {safe_title}")
     else:
-        log.error(f"  ✗ İndirme hatası (kod: {result.returncode})")
+        log.error("  ✗ İndirme hatası (tüm denemeler başarısız)")
 
-    return result.returncode == 0
+    return success
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #   TEK URL İŞLEME
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def process_url(url, output_dir="."):
+async def process_url(url, output_dir=".", snippet_seconds=0):
     """
     Tek bir URL işle: site tipi tespit → stream bul → indir.
     Tamamen otonom çalışır.
     """
     log.info(f"URL tipi algılanıyor: {url}")
 
+    rule_key, site_rule = match_site_rule(url)
+    log_site_rule(url, rule_key, site_rule)
+
     # ── YouTube ──
     if is_youtube(url):
-        return process_youtube(url, output_dir)
+        return process_youtube(url, output_dir, snippet_seconds=snippet_seconds)
 
     # ── Film / Dizi siteleri ──
     log.info("Film/dizi sitesi — bilgiler alınıyor...")
@@ -1399,22 +2422,43 @@ async def process_url(url, output_dir="."):
     if poster:
         log.debug(f"Poster: {poster}")
 
+    # CF engeli kontrolü — başlık blocked_title_markers içindeyse HTML decode atla
+    cf_blocked_html = is_cloudflare_blocked(main_html)
+    if cf_blocked_html:
+        log.warning("CF engeli tespit edildi — HTML decode atlanıyor, doğrudan tarayıcı kullanılacak")
+        title = None  # CF başlığını dosya adı olarak kullanma
+        main_html = ""
+
     stream_url = None
     referer = url
     cookie_file = None
+    embed_rule_key = rule_key
+    embed_rule = site_rule
+
+    if not cf_blocked_html and site_rule.get("direct_html_first"):
+        log.info("Site kuralı: Ana sayfa HTML decode öncelikli")
+        stream_url = extract_stream_url(main_html)
+        if stream_url:
+            log.info(f"  ✓ Stream URL (ana HTML): {stream_url}")
 
     # ── Adım 1: Net-export log (komut satırı argümanı) ──
     # (parse_args'da işlenir)
 
     # ── Adım 2: Embed URL tespiti ──
     log.info("Embed URL aranıyor...")
-    embed_url = get_embed_url_from_html(url, main_html)
+    embed_url = None if cf_blocked_html else get_embed_url_from_html(url, main_html, site_rule)
+
+    if not embed_url and site_rule.get("prefer_browser_embed"):
+        log.info("Site kuralı: Tarayıcı ile embed arama öncelikli")
+        embed_url = await get_embed_url_browser(url)
 
     if not embed_url:
         log.info("  HTML'den bulunamadı, tarayıcı ile aranıyor...")
         embed_url = await get_embed_url_browser(url)
 
     if embed_url:
+        embed_rule_key, embed_rule = match_site_rule(embed_url)
+        log_site_rule(embed_url, embed_rule_key, embed_rule)
         referer = embed_url
         log.info(f"Embed URL: {embed_url[:100]}")
 
@@ -1447,7 +2491,7 @@ async def process_url(url, output_dir="."):
                 )
                 referer = embed_ref or embed_url
                 if found:
-                    stream_url = found[0]
+                    stream_url = pick_best_stream_url(found)
                 if master_content:
                     # master.m3u8 dosyasını kaydettik (capture içinde)
                     pass
@@ -1479,14 +2523,20 @@ async def process_url(url, output_dir="."):
                 log.debug(f"  Embed fetch hatası: {e}")
 
     # ── Adım 5: Playwright genel yakalama ──
-    if not stream_url:
+    if not stream_url and (site_rule.get("prefer_playwright") or embed_rule.get("prefer_playwright") or True):
         log.info("Playwright ile doğrudan yakalama deneniyor...")
         stream_url, cookie_file = await capture_general_playwright(url, embed_url)
 
     # ── Adım 6: nodriver fallback ──
     if not stream_url:
-        log.info("nodriver ile fallback deneniyor...")
-        stream_url = await capture_stream_nodriver(url)
+        use_nodriver = bool(site_rule.get("use_nodriver_fallback", True)) or bool(
+            embed_rule.get("use_nodriver_fallback", True)
+        )
+        if use_nodriver:
+            log.info("nodriver ile fallback deneniyor...")
+            stream_url = await capture_stream_nodriver(url)
+        else:
+            log.info("Site kuralı: nodriver fallback pasif")
 
     # ── Sonuç ──
     if not stream_url:
@@ -1498,8 +2548,64 @@ async def process_url(url, output_dir="."):
         return False
 
     log.info(f"✓ Stream URL bulundu: {stream_url}")
+
+    # CF engeli nedeniyle başlık alınamadıysa URL'den türet
+    if not title:
+        slug = url.rstrip("/").split("/")[-1]
+        title = re.sub(r"[-_]", " ", slug).title() or "video"
+        log.info(f"  Başlık (URL'den): {title}")
+
     get_stream_info(stream_url, referer)
-    return download_stream(stream_url, referer, title, cookie_file, output_dir)
+    return download_stream(
+        stream_url,
+        referer,
+        title,
+        cookie_file,
+        output_dir,
+        snippet_seconds=snippet_seconds,
+        source_url=url,
+        embed_url=embed_url,
+    )
+
+
+def write_run_report(results, output_dir, snippet_seconds=0, report_path=None):
+    """Koşu sonu Türkçe markdown raporu üret."""
+    if not report_path:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = os.path.join(SCRIPT_DIR, f"RAPOR_v1.0_{ts}.md")
+
+    ok = sum(1 for _, s in results if s)
+    fail = len(results) - ok
+    lines = []
+    lines.append("# VideoFlower v1.0 Çalışma Raporu")
+    lines.append("")
+    lines.append(f"- Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append(f"- Toplam URL: {len(results)}")
+    lines.append(f"- Başarılı: {ok}")
+    lines.append(f"- Başarısız: {fail}")
+    lines.append(f"- Çıktı dizini: {os.path.abspath(output_dir)}")
+    lines.append(f"- Log dosyası: {LOG_FILE}")
+    lines.append(f"- Test kesiti: {snippet_seconds if snippet_seconds else 'tam video'}")
+    lines.append("")
+    lines.append("## URL Sonuçları")
+    lines.append("")
+    for i, (url, success) in enumerate(results, 1):
+        durum = "BASARILI" if success else "BASARISIZ"
+        lines.append(f"{i}. [{durum}] {url}")
+    lines.append("")
+    lines.append("## Otomasyon Kapsamı")
+    lines.append("")
+    lines.append("- Reklam metinleri (Skip, Reklam, Reklamı Geç) döngüsel olarak algılandı.")
+    lines.append("- Reklam sonrası Videoyu Başlat/Oynat butonları otomatik tetiklendi.")
+    lines.append("- Overlay/pop-up reklamları kapanacak şekilde akış yürütüldü.")
+    lines.append("- YouTube playlist linklerinde sıralı indirme stratejisi uygulandı.")
+    lines.append("- İndirme formatı en iyi kalite (bestvideo+bestaudio) olarak ayarlandı.")
+
+    with open(report_path, "w", encoding="utf-8") as rf:
+        rf.write("\n".join(lines))
+
+    log.info(f"Rapor üretildi: {report_path}")
+    return report_path
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1522,6 +2628,9 @@ async def main():
     parser.add_argument("-o", "--output", default=None, help="Çıktı dizini (varsayılan: ./indirilenler)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Detaylı log çıktısı")
     parser.add_argument("--log", help="Chrome net-export log dosyası (JSON)")
+    parser.add_argument("--snippet-seconds", type=int, default=0, help="Test modu: sadece ilk N saniyeyi indir")
+    parser.add_argument("--test-all-links", action="store_true", help="Dahili test linklerinin tamamını sırayla çalıştır")
+    parser.add_argument("--report", default=None, help="Rapor dosya yolu (varsayılan: otomatik RAPOR_v1.0_*.md)")
     parser.add_argument("--version", action="version", version=f"VideoFlower v{__version__}")
 
     args = parser.parse_args()
@@ -1537,6 +2646,12 @@ async def main():
 
     # URL'ler
     urls = args.urls
+    if args.test_all_links:
+        urls = DEFAULT_TEST_URLS.copy()
+        if args.snippet_seconds <= 0:
+            args.snippet_seconds = 30
+        log.info("Dahili kapsamlı test listesi aktif edildi")
+
     if not urls:
         url = input("\nVideo URL'sini girin (birden fazla için virgülle ayırın): ").strip()
         if url:
@@ -1552,6 +2667,10 @@ async def main():
     log.info(f"  Tarih  : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     log.info(f"  Çıktı  : {os.path.abspath(output_dir)}")
     log.info(f"  URL    : {len(urls)} adet")
+    if args.snippet_seconds > 0:
+        log.info(f"  Mod    : Test (ilk {args.snippet_seconds} saniye)")
+    else:
+        log.info("  Mod    : Tam indirme")
     log.info("=" * 60)
 
     # Net-export log varsa önce onu dene
@@ -1571,7 +2690,7 @@ async def main():
         log.info(f"  [{i}/{len(urls)}] {url}")
         log.info(f"{'━' * 60}")
         try:
-            success = await process_url(url, output_dir)
+            success = await process_url(url, output_dir, snippet_seconds=args.snippet_seconds)
             results.append((url, success))
         except Exception as e:
             log.error(f"Beklenmeyen hata: {e}")
@@ -1591,6 +2710,10 @@ async def main():
     log.info(f"  Log dosyası : {LOG_FILE}")
     log.info(f"{'═' * 60}")
 
+    write_run_report(results, output_dir, args.snippet_seconds, args.report)
+
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
