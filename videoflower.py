@@ -3,13 +3,7 @@
 VideoFlower v1.0 — Otonom Video İndirme Aracı
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Desteklenen siteler:
-  • YouTube (tek video + playlist)
-  • hdfilmcehennemi (.llc / .nl)
-  • hdfilmizle.so
-  • dizi54.life
-  • jetfilmizle.net / izleplus.com / zeusdizi31.com / dizibox.live
-  • pichive.online embed (Cloudflare bypass)
-  • Genel siteler (otomatik algılama)
+   • Genel siteler (otomatik algılama)
 
 Özellikler:
   ✓ Otomatik reklam tespiti ve atlama  (text-based: "Skip", "Reklamı Geç", ...)
@@ -108,19 +102,7 @@ AD_DOMAINS = [
 ]
 
 DEFAULT_TEST_URLS = [
-    "https://www.youtube.com/watch?v=Akh2RHCzab0",
-    "https://www.youtube.com/watch?v=OBJCZ_mYc8A&list=WL&index=1",
-    "https://www.hdfilmizle.so/noah-kahan-baska-bir-dunya/",
-    "https://hdfilmcehennemi.llc/a-gorilla-story-told-by-david-attenborough.html",
-    "https://dizi54.life/dizi/no-tail-to-tell/1-sezon-1-bolum/25939",
-    "https://jetfilmizle.net/dizi/kurukshetra",
-    "https://izleplus.com/180-2026/",
-    "https://zeusdizi31.com/film/ask-mi-arkadas-mi",
-    "https://dizi54.life/dizi/undercover-miss-hong/1-sezon-1-bolum/25951",
-    "https://www.hdfilmcehennemi.nl/dizi/monarch-legacy-of-monsters-61/sezon-2/bolum-8/",
-    "https://www.dizibox.live/love-story-1-sezon-1-bolum-hd-izle/",
-    "https://www.hdfilmizle.so/in-the-lost-lands/",
-    "https://www.hdfilmcehennemi.nl/28-years-later-the-bone-temple-7/",
+   "",
 ]
 
 SITE_RULES = {
