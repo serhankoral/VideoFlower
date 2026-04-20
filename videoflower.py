@@ -314,6 +314,13 @@ AD_HANDLER_JS = r"""
         return false;
     }
 
+    // ADIM 0: "Baştan başla / Continue from beginning" diyalogları
+    if (findByText([
+        'baştan başla', 'başa dön', 'başından başla', 'en baştan',
+        'start over', 'start from beginning', 'restart', 'from the beginning',
+        'yeniden başlat'
+    ])) return result;
+
     // ADIM 1: Reklam atlama butonları
     if (findByText([
         'reklamı geç', 'reklam geç', 'reklamı kapat', 'reklamı atla',
@@ -536,9 +543,37 @@ EXTRACT_PLAYER_STREAMS_JS = r"""
                 if (item.sources && item.sources.length) {
                     for (var i = 0; i < item.sources.length; i++) {
                         push(item.sources[i].file || '');
+                        push(item.sources[i].src || '');
+                    }
+                }
+                if (item.tracks && item.tracks.length) {
+                    for (var ti = 0; ti < item.tracks.length; ti++) {
+                        push(item.tracks[ti].file || '');
                     }
                 }
             }
+            // getConfig — setup sırasında set edilen dosya
+            try {
+                var cfg = jwplayer().getConfig ? jwplayer().getConfig() : null;
+                if (cfg && cfg.playlist && cfg.playlist.length) {
+                    var pi2 = cfg.playlist[0];
+                    push(pi2.file || '');
+                    if (pi2.sources) {
+                        for (var si2 = 0; si2 < pi2.sources.length; si2++) {
+                            push(pi2.sources[si2].file || '');
+                            push(pi2.sources[si2].src || '');
+                        }
+                    }
+                }
+            } catch(e2) {}
+            // Internal model — bazı JW versiyonları
+            try {
+                var jw = jwplayer();
+                if (jw._model && jw._model.get) {
+                    push(jw._model.get('playlist')[0].file || '');
+                    push(jw._model.get('mediaModel') && jw._model.get('mediaModel').get('url') || '');
+                }
+            } catch(e3) {}
         }
     } catch(e) {}
 
@@ -573,7 +608,7 @@ EXTRACT_PLAYER_STREAMS_JS = r"""
         var perf = performance.getEntriesByType('resource') || [];
         for (var ri = 0; ri < perf.length; ri++) {
             var n = perf[ri].name || '';
-            if (/(m3u8|mpd|manifest|playlist|master|hls|dash|\.mp4)(\?|$)/i.test(n)) {
+            if (/(m3u8|mpd|manifest|playlist|master|hls|dash|\.mp4|\/stream\/|\/video\/|\/hls\/|segment)(\?|$|\/)/i.test(n)) {
                 push(n);
             }
         }
@@ -846,17 +881,22 @@ def looks_like_stream_candidate(url):
     low = url.lower()
     if any(ad in low for ad in AD_DOMAINS):
         return False
+    # Stream uzantısı varsa BAD_STREAM_PARTS'ı atla (örn: /embed/stream.m3u8)
+    if any(ext in low for ext in STREAM_EXT):
+        # Yine de gerçek kötü parçaları filtrele (.css/.js/blob: gibi)
+        hard_bad = ["blob:", ".css", ".js", "cloudfront.net/\\", "|", "(", ")", "{", "}",
+                    ".webmanifest", "manifest.json", "favicon", "browserconfig"]
+        if not any(b in low for b in hard_bad):
+            return True
     if any(b in low for b in BAD_STREAM_PARTS):
         return False
-    if any(ext in low for ext in STREAM_EXT):
-        return True
     strong_hints = [
         "master", "manifest", "playlist", "variant", "index.m3u8", "/hls/", "/dash/", "/m3u/",
         "/stream/", "/video/", "/content/",
     ]
     cdn_hints = [
         "molystream", "dbx.molystream", "caec6083", "b6e10087", "seyret9.top",
-        "hotstream.club/m3u",
+        "hotstream.club/m3u", "videopark.top",
     ]
     if any(h in low for h in cdn_hints):
         return True
@@ -1017,14 +1057,23 @@ def materialize_remote_playlist(stream_url, referer):
         if resp.status_code != 200 or "#EXTM3U" not in text:
             return None
 
-        base = f"{urlparse(stream_url).scheme}://{urlparse(stream_url).netloc}"
+        # Relative URL'leri çözümlemek için playlist URL'sinin dizinini kullan
+        playlist_base = stream_url.split("?")[0].rsplit("/", 1)[0] + "/"
         fixed_lines = []
         for line in text.splitlines():
             ln = line.strip()
             if not ln or ln.startswith("#"):
                 fixed_lines.append(line)
                 continue
-            fixed_lines.append(fix_url(ln, base + "/"))
+            if ln.startswith("http://") or ln.startswith("https://"):
+                fixed_lines.append(ln)
+            elif ln.startswith("//"):
+                fixed_lines.append(f"{urlparse(stream_url).scheme}:{ln}")
+            elif ln.startswith("/"):
+                parsed = urlparse(stream_url)
+                fixed_lines.append(f"{parsed.scheme}://{parsed.netloc}{ln}")
+            else:
+                fixed_lines.append(urljoin(playlist_base, ln))
 
         out_path = os.path.join(SCRIPT_DIR, f"_hotstream_{abs(hash(stream_url)) % 100000}.m3u8")
         with open(out_path, "w", encoding="utf-8") as wf:
@@ -1047,6 +1096,7 @@ def download_jpg_hls(variant_url, out_file, referer, snippet_seconds=0):
     """
     .jpg uzantılı segment kullanan HLS stream'lerini Python requests ile indir.
     ffmpeg hls.c'deki hardcode extension kontrolünü bypass eder.
+    Master playlist gelirse en iyi varyantı seçip takip eder.
     """
     import tempfile
     hdrs = {
@@ -1059,10 +1109,17 @@ def download_jpg_hls(variant_url, out_file, referer, snippet_seconds=0):
     except Exception:
         pass
 
+    # Lokal dosya veya remote URL'den m3u8 içeriğini oku
     try:
-        r = requests.get(variant_url, headers=hdrs, verify=False, timeout=20)
-        r.raise_for_status()
-        text = r.text
+        if variant_url.startswith("http://") or variant_url.startswith("https://"):
+            r = requests.get(variant_url, headers=hdrs, verify=False, timeout=20)
+            r.raise_for_status()
+            text = r.text
+            base_url = variant_url.rsplit("/", 1)[0] + "/"
+        else:
+            with open(variant_url, encoding="utf-8") as f:
+                text = f.read()
+            base_url = ""
         if "#EXTM3U" not in text:
             log.debug("  Python HLS: geçerli m3u8 değil")
             return False
@@ -1070,7 +1127,31 @@ def download_jpg_hls(variant_url, out_file, referer, snippet_seconds=0):
         log.warning(f"  Python HLS: variant m3u8 indirilemedi: {e}")
         return False
 
-    base_url = variant_url.rsplit("/", 1)[0] + "/"
+    # Master playlist ise en iyi varyantı seç ve recurse et
+    if "#EXT-X-STREAM-INF" in text:
+        best_variant = None
+        best_bw = -1
+        lines_master = text.splitlines()
+        for i, line in enumerate(lines_master):
+            if line.startswith("#EXT-X-STREAM-INF"):
+                bw = 0
+                m = re.search(r"BANDWIDTH=(\d+)", line)
+                if m:
+                    bw = int(m.group(1))
+                for j in range(i + 1, len(lines_master)):
+                    seg = lines_master[j].strip()
+                    if seg and not seg.startswith("#"):
+                        full = seg if seg.startswith("http") else urljoin(base_url, seg) if base_url else seg
+                        if bw > best_bw:
+                            best_bw = bw
+                            best_variant = full
+                        break
+        if best_variant:
+            log.info(f"  Python HLS: master → varyant: {best_variant.split('/')[-1].split('?')[0]}")
+            return download_jpg_hls(best_variant, out_file, referer, snippet_seconds)
+        log.warning("  Python HLS: master'da varyant bulunamadı")
+        return False
+
     lines = text.splitlines()
     segments = []
     target_duration = 6.0
@@ -1181,6 +1262,15 @@ def resolve_special_stream_targets(stream_url, referer):
     targets = []
     low = (stream_url or "").lower()
     if "hotstream.club/m3u/" in low:
+        local_playlist = materialize_remote_playlist(stream_url, referer)
+        if local_playlist:
+            targets.append(("python_hls", local_playlist))
+            targets.append(("ffmpeg", local_playlist))
+        else:
+            targets.append(("python_hls", stream_url))
+            targets.append(("ffmpeg", stream_url))
+    # dizi54 CDN — segmentler uzantısız URL'lere redirect ediyor, ffmpeg reddediyor
+    if any(h in low for h in ["caec6083d6b01cf5.click", "b6e10087171e6873.click"]):
         local_playlist = materialize_remote_playlist(stream_url, referer)
         if local_playlist:
             targets.append(("python_hls", local_playlist))
@@ -1578,13 +1668,14 @@ async def ad_watcher_loop(page, found_streams, master_found_ref, duration=120):
                     if result and result.get("found"):
                         ad_count += 1
                         actions = result.get("actions", [])
-                        # Sadece "Close" tıklanıyorsa ve stream yoksa erken çık
+                        # Sadece "Close/Kapat" tıklanıyorsa ve reklam sayısı artmıyorsa erken çık
                         if all("close" in a.lower() or "kapat" in a.lower() for a in actions if a):
                             consecutive_close_clicks += 1
                         else:
                             consecutive_close_clicks = 0
-                        if consecutive_close_clicks >= 8 and elapsed > 30:
-                            log.warning(f"  [{elapsed}s] Sadece 'Close' tıklanıyor, stream bulunamıyor — döngü sonlandırılıyor")
+                        # Erken çıkış: 8+ ardışık close, 60s geçmiş, reklam sayısı 8'den fazla değil
+                        if consecutive_close_clicks >= 8 and elapsed > 60 and ad_count <= 8:
+                            log.warning(f"  [{elapsed}s] Sadece 'Close' tıklanıyor, stream yok — döngü sonlandırılıyor")
                             return
                         await asyncio.sleep(2)  # Aksiyon sonrası bekle
                         break
@@ -1667,6 +1758,14 @@ async def get_embed_url_browser(main_url):
         tab.add_handler(cdp.network.RequestWillBeSent, on_request)
         await tab.send(cdp.network.enable())
         await tab.get(main_url)
+        # "Kaldığınız yerden devam" diyalogu çıkaran siteler için storage temizle
+        _resume_sites = ["dizi54.life", "dizi54.ws", "dizi54.net"]
+        if any(s in main_url.lower() for s in _resume_sites):
+            try:
+                await tab.evaluate("localStorage.clear(); sessionStorage.clear();")
+                await tab.get(main_url)
+            except Exception:
+                pass
         await asyncio.sleep(8)
 
         if not embed_url and all_urls:
@@ -1865,6 +1964,20 @@ async def capture_general_playwright(film_url, embed_url=None, use_persistent=Fa
         try:
             await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
             log.info("  Sayfa yüklendi")
+            # "Kaldığınız yerden devam" diyalogu çıkaran siteler için storage temizle
+            _resume_dialog_sites = ["dizi54.life", "dizi54.ws", "dizi54.net"]
+            if any(s in (film_url or "").lower() for s in _resume_dialog_sites):
+                try:
+                    await page.evaluate("""
+                        () => {
+                            try { localStorage.clear(); } catch(e) {}
+                            try { sessionStorage.clear(); } catch(e) {}
+                        }
+                    """)
+                    await page.reload(wait_until="domcontentloaded", timeout=20000)
+                    log.debug("  localStorage/sessionStorage temizlendi, sayfa yenilendi")
+                except Exception:
+                    pass
             await force_autoplay(page, "ilk_yukleme")
         except Exception as e:
             log.warning(f"  Sayfa yükleme hatası (devam ediliyor): {e}")
