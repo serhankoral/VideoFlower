@@ -1,0 +1,685 @@
+{
+  "ders": "İş Eğitimi ve Meslek Ahlakı",
+  "moduller": [
+    {
+      "modul_kod": "1.1",
+      "modul_ad": "İş Sağlığı ve Güvenliği",
+      "hedefler": [
+        {
+          "kod": "1.1.1",
+          "aciklama": "İş sağlığı ve güvenliği kavramını açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.1.1",
+              "aciklama": "İş sağlığı ve güvenliği kavramını kendi cümleleriyle ifade eder."
+            },
+            {
+              "kod": "1.1.1.2",
+              "aciklama": "İş sağlığı ve güvenliği kavramına örnekler verir."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.2",
+          "aciklama": "İş sağlığı ve güvenliğinin önemini açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.2.1",
+              "aciklama": "İş sağlığı ve güvenliğinin önemini kendi cümleleriyle ifade eder."
+            },
+            {
+              "kod": "1.1.2.2",
+              "aciklama": "İş sağlığı ve güvenliğinin önemine ilişkin örnekler verir."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.3",
+          "aciklama": "Sağlıklı ve güvenli bir çalışma ortamının gerekliliklerini açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.3.1",
+              "aciklama": "Çalışma ortamının temizlik ve düzeninin gerekliliklerini söyler."
+            },
+            {
+              "kod": "1.1.3.2",
+              "aciklama": "Sağlıklı çalışma ortamının niteliklerini söyler."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.4",
+          "aciklama": "Sağlıklı ve güvenli bir çalışma ortamı oluşturur.",
+          "davranislar": [
+            {
+              "kod": "1.1.4.1",
+              "aciklama": "Çalışma ortamının temizlik ve düzenini sağlar."
+            },
+            {
+              "kod": "1.1.4.2",
+              "aciklama": "Çalışma ortamını havalandırır."
+            },
+            {
+              "kod": "1.1.4.3",
+              "aciklama": "Çalışma ortamının aydınlatma düzenini kontrol eder."
+            }
+          ],
+          "yontemler": [
+            "Doğrudan Öğretim",
+            "Sosyal Öyküler",
+            "Güç Kartları"
+          ],
+          "araclar": [
+            "Kontrol Listesi"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.5",
+          "aciklama": "İşe uygun iş ekipmanlarının güvenli kullanımını açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.5.1",
+              "aciklama": "İş ekipmanlarının güvenli kullanımını söyler."
+            },
+            {
+              "kod": "1.1.5.2",
+              "aciklama": "İş ekipmanlarının kullanımına ilişkin örnekler verir."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.6",
+          "aciklama": "İşe uygun iş ekipmanlarını güvenli kullanır.",
+          "davranislar": [
+            {
+              "kod": "1.1.6.1",
+              "aciklama": "İşe başlamadan önce kullanacağı ekipmanı kontrol eder."
+            },
+            {
+              "kod": "1.1.6.2",
+              "aciklama": "İş ekipmanlarını kullanım talimatlarına uygun kullanır."
+            }
+          ],
+          "yontemler": [
+            "Davranışsal Beceri Öğretimi",
+            "Etkinlik Çizelgeleri",
+            "Doğrudan Öğretim"
+          ],
+          "araclar": [
+            "Kontrol Listesi",
+            "Beceri Analizi Kaydı ve Beceri Analizi Kayıt Formu"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.7",
+          "aciklama": "İş ekipmanlarının kullanımından doğabilecek tehlikeleri açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.7.1",
+              "aciklama": "İş ekipmanlarının kullanımından doğabilecek tehlikeleri sayar."
+            },
+            {
+              "kod": "1.1.7.2",
+              "aciklama": "Kullanılacağı ekipmana özgü tehlikeleri sıralar."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.8",
+          "aciklama": "Sağlık ve güvenlik levhalarının adlarını tanır.",
+          "davranislar": [
+            {
+              "kod": "1.1.8.1",
+              "aciklama": "Sağlık ve güvenlik işaret levhalarını gösterir."
+            },
+            {
+              "kod": "1.1.8.2",
+              "aciklama": "Sağlık ve güvenlik işaret levhalarının adlarını söyler."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.9",
+          "aciklama": "Sağlık ve güvenlik işaretlerini türlerine göre ayırt eder.",
+          "davranislar": [
+            {
+              "kod": "1.1.9.1",
+              "aciklama": "Söylenen sağlık ve güvenlik işaret türüne uygun levhayı gösterir."
+            },
+            {
+              "kod": "1.1.9.2",
+              "aciklama": "Rengi ifade edilen levhanın ait olduğu sağlık ve güvenlik işaretini söyler."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.10",
+          "aciklama": "Kişisel koruyucu donanımların önemini açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.10.1",
+              "aciklama": "Kişisel koruyucu donanımların kullanım amaçlarını söyler."
+            },
+            {
+              "kod": "1.1.10.2",
+              "aciklama": "Kişisel koruyucu donanımların önlediği tehlikeleri söyler."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.11",
+          "aciklama": "Kişisel koruyucu donanım tanır.",
+          "davranislar": [
+            {
+              "kod": "1.1.11.1",
+              "aciklama": "İşe uygun kişisel koruyucu donanımları gösterir."
+            },
+            {
+              "kod": "1.1.11.2",
+              "aciklama": "İşe uygun kişisel koruyucu donanımların adlarını söyler."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.12",
+          "aciklama": "Kişisel koruyucu donanım kullanır.",
+          "davranislar": [
+            {
+              "kod": "1.1.12.1",
+              "aciklama": "İş önlüğü giyer."
+            },
+            {
+              "kod": "1.1.12.2",
+              "aciklama": "Çalışma ortamına uygun baret takar."
+            },
+            {
+              "kod": "1.1.12.3",
+              "aciklama": "Çalışma ortamına uygun gözlük takar."
+            },
+            {
+              "kod": "1.1.12.4",
+              "aciklama": "Çalışma ortamına ve işe uygun yüz koruyucu maske takar."
+            },
+            {
+              "kod": "1.1.12.5",
+              "aciklama": "İşe uygun eldiven giyer."
+            },
+            {
+              "kod": "1.1.12.6",
+              "aciklama": "İşe uygun iş ayakkabısı giyer."
+            }
+          ],
+          "yontemler": [
+            "Davranışsal Beceri Öğretimi",
+            "Model Olma",
+            "Video Modelle Öğretim",
+            "Aşamalı Yardım"
+          ],
+          "araclar": [
+            "Kontrol Listesi",
+            "Beceri Analizi Kaydı ve Beceri Analizi Kayıt Formu"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.13",
+          "aciklama": "Kişisel koruyucu donanımların bakım ve temizliği ile ilgili kuralları uygular.",
+          "davranislar": [
+            {
+              "kod": "1.1.13.1",
+              "aciklama": "Kişisel koruyucu ve donanımların temizliğini yapar."
+            },
+            {
+              "kod": "1.1.13.2",
+              "aciklama": "Kişisel koruyucu ve donanımların iş bitiminde bakımlarını yaparak temizlik ve muhafazasını gerçekleştirir."
+            }
+          ],
+          "yontemler": [
+            "Davranışsal Beceri Öğretimi",
+            "Model Olma",
+            "Video Modelle Öğretim",
+            "Aşamalı Yardım"
+          ],
+          "araclar": [
+            "Kontrol Listesi",
+            "Beceri Analizi Kaydı ve Beceri Analizi Kayıt Formu"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.14",
+          "aciklama": "Acil durumları açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.14.1",
+              "aciklama": "Acil durumları söyler."
+            },
+            {
+              "kod": "1.1.14.2",
+              "aciklama": "Acil durumlara örnekler verir."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": [
+            "Hedef 1.1.14 için: Acil duruma örnekleri olarak yangın, patlama, tehlikeli kimyasal maddelerden kaynaklanan yayılım, zehirlenme, salgın hastalık, doğal afet vb. öğretimi yapılmalıdır."
+          ]
+        },
+        {
+          "kod": "1.1.15",
+          "aciklama": "Acil durumlarda izlemesi gereken aşamaları açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.15.1",
+              "aciklama": "Acil bir durumda izlemesi gereken aşamaları söyler."
+            },
+            {
+              "kod": "1.1.15.2",
+              "aciklama": "Acil bir durumda iletişim kuracağı kişileri söyler."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.16",
+          "aciklama": "Acil durumlarda izlemesi gereken aşamaları uygular.",
+          "davranislar": [
+            {
+              "kod": "1.1.16.1",
+              "aciklama": "Acil durumlarda yetkili kişileri durumla ilgili bilgilendirir."
+            },
+            {
+              "kod": "1.1.16.2",
+              "aciklama": "Yangın alarm butonuna basar."
+            },
+            {
+              "kod": "1.1.16.3",
+              "aciklama": "Yangın tüpünü talimata uygun bir şekilde kullanır."
+            },
+            {
+              "kod": "1.1.16.4",
+              "aciklama": "Acil durumlarda güvenli kaçış yollarını takip ederek binayı terk eder."
+            },
+            {
+              "kod": "1.1.16.5",
+              "aciklama": "Acil toplanma alanına gider."
+            }
+          ],
+          "yontemler": [
+            "Davranışsal Beceri Öğretimi",
+            "Model Olma",
+            "Video Modelle Öğretim",
+            "Aşamalı Yardım"
+          ],
+          "araclar": [
+            "Kontrol Listesi",
+            "Beceri Analizi Kaydı ve Beceri Analizi Kayıt Formu",
+            "Süre Kaydı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.17",
+          "aciklama": "İş kazalarını açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.17.1",
+              "aciklama": "İş kazalarının türlerini söyler."
+            },
+            {
+              "kod": "1.1.17.2",
+              "aciklama": "İş kazalarına örnekler verir."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.18",
+          "aciklama": "İş kazalarını önlemeye yönelik tedbirleri alır.",
+          "davranislar": [
+            {
+              "kod": "1.1.18.1",
+              "aciklama": "Atölyede işi talimatlara uygun bir şekilde yapar."
+            },
+            {
+              "kod": "1.1.18.2",
+              "aciklama": "Makineleri koruyucuları ile kullanır."
+            },
+            {
+              "kod": "1.1.18.3",
+              "aciklama": "Güvenli hızda çalışır."
+            },
+            {
+              "kod": "1.1.18.4",
+              "aciklama": "Kendisine verilen görevlerin dışına çıkmaz."
+            },
+            {
+              "kod": "1.1.18.5",
+              "aciklama": "Kişisel koruyucu donanımları kullanır."
+            }
+          ],
+          "yontemler": [
+            "Davranışsal Beceri Öğretimi",
+            "Model Olma",
+            "Video Modelle Öğretim",
+            "Aşamalı Yardım"
+          ],
+          "araclar": [
+            "Kontrol Listesi",
+            "Beceri Analizi Kaydı ve Beceri Analizi Kayıt Formu",
+            "Süre Kaydı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.19",
+          "aciklama": "Çalıştığı işle ilgili riskleri açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.19.1",
+              "aciklama": "Çalıştığı işle ilgili riskleri söyler."
+            },
+            {
+              "kod": "1.1.19.2",
+              "aciklama": "Çalıştığı işle ilgili risklere örnekler verir."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": [
+            "Hedef 1.9.1 için: Kırmızının yangınla mücadele ekipmanları ve yasaklayıcı işaretleri olduğu, sarının uyarı işaretleri olduğu, mavinin emredici işaretleri olduğu, yeşilin de acil çıkış ve ilk yardım işaretleri olduğuyla ilgili öğretim yapılmalıdır."
+          ]
+        },
+        {
+          "kod": "1.1.20",
+          "aciklama": "İlk yardımın tanımını bilir.",
+          "davranislar": [
+            {
+              "kod": "1.1.20.1",
+              "aciklama": "İlk yardımın tanımını kendi ifadeleri ile söyler."
+            },
+            {
+              "kod": "1.1.20.2",
+              "aciklama": "İlk yardımın tanımını kendi ifadeleri ile yazar."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.21",
+          "aciklama": "Hafif yaralanma çeşitlerini açıklar.",
+          "davranislar": [
+            {
+              "kod": "1.1.21.1",
+              "aciklama": "Hafif yaralanma çeşitlerini ifade eder."
+            },
+            {
+              "kod": "1.1.21.2",
+              "aciklama": "Hafif yaralanma çeşitleri ile ilgili örnekler verir."
+            }
+          ],
+          "yontemler": [
+            "Eş Zamanlı İpucu ile Öğretim",
+            "Sabit Bekleme Süreli Öğretim",
+            "Artan Bekleme Süreli Öğretim",
+            "Doğrudan Öğretim",
+            "Soru Cevap"
+          ],
+          "araclar": [
+            "Ayrık Deneme Kaydı ve Ayrık Deneme Kayıt Formu",
+            "Ölçüt Bağımlı Ölçü Aracı"
+          ],
+          "notlar": [
+            "Hedef 1.1.21 için: Yaralanmalarda müdahale edemeyeceği durumlarda 112'nin aranması gerektiğini söyler. (Bağımsız hedef davranış)"
+          ]
+        },
+        {
+          "kod": "1.1.22",
+          "aciklama": "Kanamalara müdahale yöntemlerini uygular.",
+          "davranislar": [
+            {
+              "kod": "1.1.22.1",
+              "aciklama": "Ecza dolabından kanamaya müdahale edecek ilk yardım malzemelerini seçer."
+            },
+            {
+              "kod": "1.1.22.2",
+              "aciklama": "Kanamayı durdurmak için temiz bir bezle yara üzerine baskı yapar."
+            },
+            {
+              "kod": "1.1.22.3",
+              "aciklama": "Kanamanın durmaması hâlinde ikinci bir bezle yara üzerine baskı yapmaya devam eder."
+            },
+            {
+              "kod": "1.1.22.4",
+              "aciklama": "Kanama olan bölgeyi kalp seviyesinden yukarıya yükseltir."
+            }
+          ],
+          "yontemler": [
+            "Davranışsal Beceri Öğretimi",
+            "Model Olma",
+            "Video Modelle Öğretim",
+            "Aşamalı Yardım"
+          ],
+          "araclar": [
+            "Kontrol Listesi",
+            "Beceri Analizi Kaydı ve Beceri Analizi Kayıt Formu"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.23",
+          "aciklama": "Yanıklara müdahale yöntemlerini uygular.",
+          "davranislar": [
+            {
+              "kod": "1.1.23.1",
+              "aciklama": "Yanık durumlarında bedene yapışan kıyafet varsa keserek çıkarır."
+            },
+            {
+              "kod": "1.1.23.2",
+              "aciklama": "Yanık durumlarında yanan bölgeyi 20 dakika boyunca soğuk akan suyun altında tutar."
+            }
+          ],
+          "yontemler": [
+            "Davranışsal Beceri Öğretimi",
+            "Model Olma",
+            "Video Modelle Öğretim",
+            "Aşamalı Yardım"
+          ],
+          "araclar": [
+            "Kontrol Listesi",
+            "Beceri Analizi Kaydı ve Beceri Analizi Kayıt Formu",
+            "Süre Kaydı"
+          ],
+          "notlar": []
+        },
+        {
+          "kod": "1.1.24",
+          "aciklama": "Elektrik çarpmalarında müdahale yöntemlerini uygular.",
+          "davranislar": [
+            {
+              "kod": "1.1.24.1",
+              "aciklama": "Öncelikle elektrik akımını keser."
+            },
+            {
+              "kod": "1.1.24.2",
+              "aciklama": "Elektrik akımı kesemeyeceği durumlarda yalıtkan bir malzeme ile kişiyi akımdan uzaklaştırır."
+            },
+            {
+              "kod": "1.1.24.3",
+              "aciklama": "Acil durumlarda 112'nin aranması gerektiğini söyler."
+            }
+          ],
+          "yontemler": [
+            "Davranışsal Beceri Öğretimi",
+            "Model Olma",
+            "Video Modelle Öğretim",
+            "Aşamalı Yardım"
+          ],
+          "araclar": [
+            "Kontrol Listesi",
+            "Beceri Analizi Kaydı ve Beceri Analizi Kayıt Formu"
+          ],
+          "notlar": []
+        }
+      ]
+    }
+  ]
+}
